@@ -4,11 +4,24 @@ import random
 from typing import List
 
 
-class Minesweeper():
-    """
-    Minesweeper game representation
-    """
 
+"""
+Called when the Minesweeper board tells us, for a given
+safe cell, how many neighboring cells have mines in them.
+                                                               
+This function should:
+    1) mark the cell as a move that has been made
+    2) mark the cell as safe
+    3) add a new sentence to the AI's knowledge base
+       based on the value of `cell` and `count`
+    4) mark any additional cells as safe or as mines
+       if it can be concluded based on the AI's knowledge base
+    5) add any new sentences to the AI's knowledge base
+       if they can be inferred from existing knowledge
+"""
+
+class Minesweeper():
+    
     def __init__(self, height=8, width=8, mines=8):
         self.height = height
         self.width = width
@@ -121,22 +134,34 @@ class MinesweeperAI():
         for sentence in self.knowledge:
             sentence.mark_safe(cell)
 
-    def add_knowledge(self, cell, count):
-        """
-        Called when the Minesweeper board tells us, for a given
-        safe cell, how many neighboring cells have mines in them.
 
-        This function should:
-            1) mark the cell as a move that has been made
-            2) mark the cell as safe
-            3) add a new sentence to the AI's knowledge base
-               based on the value of `cell` and `count`
-            4) mark any additional cells as safe or as mines
-               if it can be concluded based on the AI's knowledge base
-            5) add any new sentences to the AI's knowledge base
-               if they can be inferred from existing knowledge
-        """
+    def extract_knowledge(self, input_sentence_knowledge: Sentence, sentence: Sentence):
         
+        if self.is_proper_subset(input_sentence_knowledge, sentence): 
+            print("ispropersubset")
+            
+            unknown = sentence.unknown()
+            #cell_nearby_mines = count
+            cell_nearby_mines = input_sentence_knowledge.count
+                                                                                                                                      
+            # what if they are both count zero 
+            # what if input_sentence_knowledge count is zero 
+            # what if the sentence is count zero
+            # what if new_sentence.count is bigger than sentence.count?
+                # - diff will be negative
+            mines_diff = min(sentence.count - cell_nearby_mines, 0)
+                                                                                                                                      
+            new_knowledge = Sentence(unknown - unknown.intersection(input_sentence_knowledge.unknown()), sentence.count - mines_diff)
+            new_knowledge.mines = new_knowledge.cells.intersection(self.mines)
+            new_knowledge.safes = new_knowledge.cells.intersection(self.safes)
+            self.knowledge.append(new_knowledge)
+
+        elif self.is_proper_subset(sentence, input_sentence_knowledge):
+            print("ispropersuperset")
+
+
+    def add_knowledge(self, cell, count):
+      
         self.moves_made.add(cell)
         self.mark_safe(cell) 
 
@@ -147,29 +172,8 @@ class MinesweeperAI():
         self.knowledge.append(input_sentence_knowledge)                
          
         for sentence in self.knowledge:
-            if self.is_proper_subset(input_sentence_knowledge, sentence): 
-                
-                print("ispropersubset")
-                
-                unknown = sentence.unknown()
-                cell_nearby_mines = count 
-
-                # what if they are both count zero 
-                # what if input_sentence_knowledge count is zero 
-                # what if the sentence is count zero
-                # what if new_sentence.count is bigger than sentence.count?
-                    # - diff will be negative
-                mines_diff = min(sentence.count - cell_nearby_mines, 0)
-
-                new_knowledge = Sentence(unknown - unknown.intersection(input_sentence_knowledge.unknown()), sentence.count - mines_diff)
-                new_knowledge.mines = new_knowledge.cells.intersection(self.mines)
-                new_knowledge.safes = new_knowledge.cells.intersection(self.safes)
-                self.knowledge.append(new_knowledge)
-
-            elif self.is_proper_subset(sentence, new_sentence):
-                print("ispropersuperset")
-
- 
+            self.extract_knowledge(input_sentence_knowledge, sentence)
+            
     def is_proper_subset(self, a: Sentence, b: Sentence):
         return a.unknown().issubset(b.unknown()) and not a.__eq__(b) #review it
 
