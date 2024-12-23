@@ -4,22 +4,6 @@ import random
 from typing import List
 
 
-
-"""
-Called when the Minesweeper board tells us, for a given
-safe cell, how many neighboring cells have mines in them.
-                                                               
-This function should:
-    1) mark the cell as a move that has been made
-    2) mark the cell as safe
-    3) add a new sentence to the AI's knowledge base
-       based on the value of `cell` and `count`
-    4) mark any additional cells as safe or as mines
-       if it can be concluded based on the AI's knowledge base
-    5) add any new sentences to the AI's knowledge base
-       if they can be inferred from existing knowledge
-"""
-
 class Minesweeper():
     
     def __init__(self, height=8, width=8, mines=8):
@@ -152,8 +136,9 @@ class MinesweeperAI():
             subset = sentence 
         
         if subset is not None and superset is not None: 
-            print("issubset or superset")
             
+            print("issubset or superset")
+
             unknown = superset.unknown()  
             mines_diff = min(superset.count - subset.count, 0)
                                                                                                                                       
@@ -174,7 +159,7 @@ class MinesweeperAI():
             for sentence in self.knowledge:
                 self.extract_knowledge(new_knowledge, sentence)            
 
-    
+    # remove code repetition 
     def add_knowledge(self, cell, count):
       
         self.moves_made.add(cell)
@@ -218,14 +203,6 @@ class MinesweeperAI():
 
  
     def make_safe_move(self):
-        """
-        Returns a safe cell to choose on the Minesweeper board.
-        The move must be known to be safe, and not already a move
-        that has been made.
-
-        This function may use the knowledge in self.mines, self.safes
-        and self.moves_made, but should not modify any of those values.
-        """
         for safe in self.safes:
             if self.moves_made.__contains__(safe):
                 continue
