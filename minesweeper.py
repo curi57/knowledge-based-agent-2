@@ -134,32 +134,47 @@ class MinesweeperAI():
         for sentence in self.knowledge:
             sentence.mark_safe(cell)
 
-
-    def extract_knowledge(self, input_sentence_knowledge: Sentence, sentence: Sentence):
+    # what if they are both count zero 
+    # what if new_sentence count is zero 
+    # what if the sentence is count zero
+    # what if new_sentence.count is bigger than sentence.count?
+        # - diff will be negative
+    def extract_knowledge(self, new_sentence: Sentence, sentence: Sentence):
         
-        if self.is_proper_subset(input_sentence_knowledge, sentence): 
-            print("ispropersubset")
+        subset = None
+        superset = None
+        
+        if self.is_proper_subset(new_sentence, sentence): 
+            subset = new_sentence
+            superset = sentence 
+        elif self.is_proper_subset(sentence, new_sentence): 
+            superset = new_sentence
+            subset = sentence 
+        
+        if subset is not None and superset is not None: 
+            print("issubset or superset")
             
-            unknown = sentence.unknown()
-            #cell_nearby_mines = count
-            cell_nearby_mines = input_sentence_knowledge.count
+            unknown = superset.unknown()  
+            mines_diff = min(superset.count - subset.count, 0)
                                                                                                                                       
-            # what if they are both count zero 
-            # what if input_sentence_knowledge count is zero 
-            # what if the sentence is count zero
-            # what if new_sentence.count is bigger than sentence.count?
-                # - diff will be negative
-            mines_diff = min(sentence.count - cell_nearby_mines, 0)
-                                                                                                                                      
-            new_knowledge = Sentence(unknown - unknown.intersection(input_sentence_knowledge.unknown()), sentence.count - mines_diff)
+            new_knowledge = Sentence(unknown - unknown.intersection(subset.unknown()), superset.count - mines_diff)
             new_knowledge.mines = new_knowledge.cells.intersection(self.mines)
             new_knowledge.safes = new_knowledge.cells.intersection(self.safes)
+            
+            new_knowledge_unknown = new_knowledge.unknown()
+            if new_knowledge.count == len(new_knowledge_unknown):
+                for cell in new_knowledge_unknown:
+                    self.mark_mine(cell)
+            elif new_knowledge.count == 0:
+                for cell in new_knowledge_unknown:
+                    self.mark_safe(cell)
+
             self.knowledge.append(new_knowledge)
+            
+            for sentence in self.knowledge:
+                self.extract_knowledge(new_knowledge, sentence)            
 
-        elif self.is_proper_subset(sentence, input_sentence_knowledge):
-            print("ispropersuperset")
-
-
+    
     def add_knowledge(self, cell, count):
       
         self.moves_made.add(cell)
@@ -169,11 +184,21 @@ class MinesweeperAI():
         input_sentence_knowledge = Sentence(neighboring, count)
         input_sentence_knowledge.mines = input_sentence_knowledge.cells.intersection(self.mines)
         input_sentence_knowledge.safes = input_sentence_knowledge.cells.intersection(self.safes)
+        
+        input_sentence_knowledge_unknown = input_sentence_knowledge.unknown()
+        if input_sentence_knowledge.count == len(input_sentence_knowledge_unknown):
+            for cell in input_sentence_knowledge_unknown:
+                self.mark_mine(cell)
+        elif input_sentence_knowledge.count == 0:
+            for cell in input_sentence_knowledge_unknown:
+                self.mark_safe(cell)
+
         self.knowledge.append(input_sentence_knowledge)                
          
         for sentence in self.knowledge:
             self.extract_knowledge(input_sentence_knowledge, sentence)
-            
+           
+
     def is_proper_subset(self, a: Sentence, b: Sentence):
         return a.unknown().issubset(b.unknown()) and not a.__eq__(b) #review it
 
