@@ -1,5 +1,4 @@
-from _typeshed import Self
-import itertools
+#import itertools
 import random
 from typing import List
 
@@ -65,9 +64,12 @@ class Sentence():
 
     def __init__(self, cells, count):
         self.cells = set(cells)
-        self.count = count 
+        self.count = count
+
         self.safes = set()
         self.mines = set()
+
+        #self.__update()
 
     def __eq__(self, other):
         return self.cells == other.cells and self.count == other.count
@@ -84,13 +86,29 @@ class Sentence():
     def mark_mine(self, cell):
         if self.cells.__contains__(cell):
             self.mines.add(cell)
+            self.cells.remove(cell)
+            self.count = self.count - 1
 
     def mark_safe(self, cell):    
         if self.cells.__contains__(cell):
             self.safes.add(cell)
+            self.cells.remove(cell)
 
-    def unknown(self) -> set:
-        return self.cells - self.cells.intersection(self.safes.union(self.mines))
+    def update(self, safes: set, mines: set):
+        unknowns = len(self.cells)
+                                                                 
+        if self.count == 0 and unknowns > 0:
+            self.safes |= self.cells
+            self.cells.clear()      
+        elif self.count > 0 and self.count == unknowns:
+            self.mines |= self.cells
+            self.cells.clear()
+            self.count = 0
+        else:
+            for safe in safes:
+                self.mark_safe(safe)                             
+            for mine in mines:
+                self.mark_mine(mine)
 
 
 # this class contains all the knowledge about the envinroment
@@ -100,12 +118,9 @@ class MinesweeperAI():
 
         self.height = height
         self.width = width
-
         self.moves_made = set()
-
         self.mines = set()
         self.safes = set()
-
         self.knowledge: List[Sentence] = []
 
     def mark_mine(self, cell):  
@@ -117,78 +132,85 @@ class MinesweeperAI():
         self.safes.add(cell)
         for sentence in self.knowledge:
             sentence.mark_safe(cell)
-
-    # what if they are both count zero 
-    # what if new_sentence count is zero 
-    # what if the sentence is count zero
-    # what if new_sentence.count is bigger than sentence.count?
-        # - diff will be negative
-    def extract_knowledge(self, new_sentence: Sentence, sentence: Sentence):
-        
-        subset = None
-        superset = None
-        
-        if self.is_proper_subset(new_sentence, sentence): 
-            subset = new_sentence
-            superset = sentence 
-        elif self.is_proper_subset(sentence, new_sentence): 
-            superset = new_sentence
-            subset = sentence 
-        
-        if subset is not None and superset is not None: 
+       
+    def extract_knowledge(self, new_sentence: Sentence):
+       
+        new_knowledge = None 
+        for sentence in self.knowledge:
+            subset = None
+            superset = None        
+            if self.is_proper_subset(new_sentence, sentence): 
+                subset = new_sentence
+                superset = sentence 
+            elif self.is_proper_subset(sentence, new_sentence): 
+                superset = new_sentence
+                subset = sentence 
             
-            print("issubset or superset")
+            if subset is not None and superset is not None: 
+ 
+                print(f"superset: {superset}")
+                print(f"subset: {subset}") 
 
-            unknown = superset.unknown()  
-            mines_diff = min(superset.count - subset.count, 0)
-                                                                                                                                      
-            new_knowledge = Sentence(unknown - unknown.intersection(subset.unknown()), superset.count - mines_diff)
-            new_knowledge.mines = new_knowledge.cells.intersection(self.mines)
-            new_knowledge.safes = new_knowledge.cells.intersection(self.safes)
-            
-            new_knowledge_unknown = new_knowledge.unknown()
-            if new_knowledge.count == len(new_knowledge_unknown):
-                for cell in new_knowledge_unknown:
-                    self.mark_mine(cell)
-            elif new_knowledge.count == 0:
-                for cell in new_knowledge_unknown:
-                    self.mark_safe(cell)
+                new_knowledge_cells = superset.cells - superset.cells.intersection(subset.cells) 
+                mines_diff = min(superset.count - subset.count, 0)                                                                          
+                new_knowledge = Sentence(new_knowledge_cells, superset.count - mines_diff)
+                #new_knowledge.update(self.safes, self.mines) # esta função deve fornecer informação suficiente para quê outras partes do conhecimento possam se atualizar
+                self.update_knowledge_base(new_knowledge)
 
+                # also check for updates on previous knowledge (after update knowledge base from new knowledge)
+                #self.update_knowledge_base(sentence) -> WHY?!
+
+                # avoid an infinite loop
+                if not self.knowledge.__contains__(new_knowledge):
+                    self.extract_knowledge(new_knowledge)       
+
+        # why add knowledge after iteration? how it does impact the final result from the knowledge intersections?
+        if new_knowledge is not None: 
             self.knowledge.append(new_knowledge)
-            
-            for sentence in self.knowledge:
-                self.extract_knowledge(new_knowledge, sentence)            
 
-    # remove code repetition 
-    def add_knowledge(self, cell, count):
-      
+    
+    # add knowledge acquired from the game
+    def add_acquired_knowledge(self, cell):
         self.moves_made.add(cell)
         self.mark_safe(cell) 
 
-        neighboring = self.get_neighboring(cell) 
-        input_sentence_knowledge = Sentence(neighboring, count)
-        input_sentence_knowledge.mines = input_sentence_knowledge.cells.intersection(self.mines)
-        input_sentence_knowledge.safes = input_sentence_knowledge.cells.intersection(self.safes)
+    def update_knowledge_base(self, sentence: Sentence):
         
-        input_sentence_knowledge_unknown = input_sentence_knowledge.unknown()
-        if input_sentence_knowledge.count == len(input_sentence_knowledge_unknown):
-            for cell in input_sentence_knowledge_unknown:
-                self.mark_mine(cell)
-        elif input_sentence_knowledge.count == 0:
-            for cell in input_sentence_knowledge_unknown:
-                self.mark_safe(cell)
+        #if len(sentence.cells) == 0:
+        #    return False
+        
+        unknowns = len(sentence.cells)
+        if sentence.count == 0 and unknowns > 0:
+            sentence.safes |= sentence.cells
+            sentence.cells.clear()      
+        elif sentence.count > 0 and sentence.count == unknowns:
+            sentence.mines |= sentence.cells
+            sentence.cells.clear()
+            sentence.count = 0
+        else:
+            for safe in self.safes:
+                sentence.mark_safe(safe)                             
+            for mine in self.mines:
+                sentence.mark_mine(mine)
 
-        self.knowledge.append(input_sentence_knowledge)                
-         
-        for sentence in self.knowledge:
-            self.extract_knowledge(input_sentence_knowledge, sentence)
+    # remove code repetition 
+    def add_knowledge(self, cell, count):
+        
+        print(f"{cell} - {count}")
+
+        self.add_acquired_knowledge(cell) 
+        
+        acquired_knowledge = Sentence(self.get_neighboring(cell), count)
+        acquired_knowledge.update(self.safes, self.mines)
+        
+        self.extract_knowledge(acquired_knowledge)
            
 
     def is_proper_subset(self, a: Sentence, b: Sentence):
-        return a.unknown().issubset(b.unknown()) and not a.__eq__(b) #review it
-
+        return a != b and len(a.cells) > 0 and a.cells.issubset(b.cells) # eliminating empty sets
+    
+    # apply matrix operation
     def get_neighboring(self, cell: tuple):
-
         neighboring = set()
         for i in range(cell[0] - 1, cell[0] + 2):
             for j in range(cell[1] - 1, cell[1] + 2):                                                         
@@ -207,6 +229,7 @@ class MinesweeperAI():
             if self.moves_made.__contains__(safe):
                 continue
             self.moves_made.add(safe)
+        
             return safe
 
         return None
