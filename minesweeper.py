@@ -1,5 +1,6 @@
 #import itertools
 import random
+from types import UnionType
 from typing import List
 
 
@@ -105,6 +106,9 @@ class MinesweeperAI():
         self.safes = set()
         self.knowledge: List[Sentence] = []
 
+    def __str__(self):
+        return f"mines: {str(self.mines)}"
+
     def mark_mine(self, cell):  
         self.mines.add(cell)
         for sentence in self.knowledge:
@@ -114,11 +118,60 @@ class MinesweeperAI():
         self.safes.add(cell)
         for sentence in self.knowledge:
             sentence.mark_safe(cell)
+
+    def add_knowledge(self, cell, count):                                                                                                                                             
+     
+        print(f"{cell} - {count}")
        
-    def extract_knowledge(self, new_sentence: Sentence):
+        self.moves_made.add(cell) 
+        self.mark_safe(cell) # marca a célula descoberta como 'safe' em toda a base de conhecimento = ['Conhecimento Adquirido']
         
-        self.knowledge.append(new_sentence)
-        new_knowledge = None 
+        # acquired_knowledge representa todas as células que são vizinhas da célula clicada, exceto a mesma
+        acquired_knowledge = Sentence(self.get_neighboring(cell), count)
+        self.knowledge.append(acquired_knowledge)
+
+        # aqui a atualização de conhecimento poderá ser feita com base em inferências explícitas, como o número de minas ser igual a ZERO para todas as células vizinhas
+        needs_update = self.__update_knowledge_base(acquired_knowledge)
+        if needs_update:
+            # esta função simplesmente atualiza o novo conhecimento adquirido com informações de células com minas e seguras já descobertas na base de conhecimento 
+            for safe in self.safes:
+                self.mark_safe(safe)
+            for mine in self.mines:
+                self.mark_mine(mine)
+
+        print(self)
+              
+        self.__create_knowledge(acquired_knowledge)
+
+
+    def __update_knowledge_base(self, sentence: Sentence) -> bool:                                                                                     
+        
+        # nota: é possível ter uma sentença com zero/ zero?
+            # - é possível que uma sentença que represente um conhecimento prévio que tenha sido atualizado até que ambas as propriedades possuam valor ZERO
+        if len(sentence.cells) == 0:
+            print(f"sentence.cells == 0 must have {sentence.count} value (zero)")
+            return True
+       
+        all_safes = sentence.count == 0 and len(sentence.cells) > 0
+        all_mines = sentence.count > 0 and sentence.count == len(sentence.cells)
+
+        if all_safes or all_mines:
+            if all_safes:
+                cp_cells = sentence.cells.copy()
+                for cell in cp_cells:
+                    self.mark_safe(cell)                                                                                                                                   
+            elif all_mines:
+                cp_cells = sentence.cells.copy()
+                for cell in cp_cells:
+                    self.mark_mine(cell)                                                                                                                              
+            
+            return False 
+
+        return True 
+         
+    def __create_knowledge(self, new_sentence: Sentence):
+        
+        #new_knowledge = None 
         for sentence in self.knowledge:
             subset = None
             superset = None        
@@ -130,79 +183,32 @@ class MinesweeperAI():
                 subset = sentence 
             
             if subset is not None and superset is not None: 
- 
                 print(f"superset: {superset}")
                 print(f"subset: {subset}") 
 
-                new_knowledge_cells = superset.cells.difference(subset.cells) 
-                mines_diff = max(superset.count - subset.count, 0)                                                                          
-                new_knowledge = Sentence(new_knowledge_cells, mines_diff)  
-            
-                print(f"new_knowledge before update: {new_knowledge}")
+                mines_diff = max(superset.count - subset.count, 0)
+                new_knowledge = Sentence(superset.cells.difference(subset.cells), mines_diff) 
+                #superset = Sentence(superset.cells.difference(subset.cells), mines_diff)  
+                
+                print(f"new_knowledge before update: {superset}")
+                
+                # nota: não é necessário atualizar safes e minas para este novo conhecimento pois o mesmo é um subset de uma relação de conhecimentos previamente atualizados
+                # aqui precisamos apenas tentar inferir novas minas ou novos 'safes'
+                needs_update = self.__update_knowledge_base(new_knowledge)
+                if needs_update:
+                    for previous_sentence in self.knowledge:
+                        # verificar também se elementos mais 'antigos' da base de conhecimento podem oferecer algum tipo de inferência para o modelo de aprendizado
+                        self.__update_knowledge_base(previous_sentence) 
 
-                self.update_knowledge_base(new_knowledge)
+                # anti loop-infinito
+                #if not self.knowledge.__contains__(new_knowledge):
+                #self.__create_knowledge(superset)       
 
-                print(f"new_knowledge after update: {new_knowledge}")
-
-                # also check for updates on previous knowledge (after update knowledge base from new knowledge)
-                self.update_knowledge_base(sentence) 
-
-                # avoid an infinite loop
-                if not self.knowledge.__contains__(new_knowledge):
-                    self.extract_knowledge(new_knowledge)       
-
-        # why add knowledge after iteration? how it does impact the final result from the knowledge intersections?
-        if new_knowledge is not None: 
-            self.knowledge.append(new_knowledge)
-
-    def update_knowledge_base(self, sentence: Sentence):
-
-        unknowns = len(sentence.cells)
-        all_safes = sentence.count == 0 and unknowns > 0
-        all_mines = sentence.count > 0 and sentence.count == unknowns
-
-        if all_safes:
-            cp_cells = sentence.cells.copy()
-            for cell in cp_cells:
-                self.mark_safe(cell)  
-
-        elif all_mines:
-            cp_cells = sentence.cells.copy()
-            for cell in cp_cells:
-                self.mark_mine(cell)  
-
-        else:
-            # it just updates the sentence itself. all knowledge required is already known by the other components of the knowledge base
-            sentence.safes |= self.safes
-            sentence.mines |= self.mines
-            #for safe in self.safes:
-            #    sentence.mark_safe(safe)                             
-            #for mine in self.mines:
-            #    sentence.mark_mine(mine)
-    
-    # add knowledge acquired from the game
-    def add_acquired_knowledge(self, cell):
-        self.moves_made.add(cell)
-        self.mark_safe(cell) 
-
-    def add_knowledge(self, cell, count):
-        
-        print(f"{cell} - {count}")
-        
-        # 1. Atualizando toda a base de conhecimento com uma nova célula 'safe' -> um conhecimento adquirido no jogo e relacionado a uma única célula que foi clicada (adiciona em self.safes e em self.safes em cada Sentence)
-        self.add_acquired_knowledge(cell) 
-        
-        acquired_knowledge = Sentence(self.get_neighboring(cell), count)
-        # 2. Aqui a atualização de conhecimento poderá ser feita com base em inferências explícitas, como o número de minas ser igual a ZERO para todas as células vizinhas
-        self.update_knowledge_base(acquired_knowledge)
-        
-        self.extract_knowledge(acquired_knowledge)
-           
-
+     
     def is_proper_subset(self, a: Sentence, b: Sentence):
-        return a != b and len(a.cells) > 0 and a.cells.issubset(b.cells) # eliminating empty sets
+        return a != b and (len(a.cells) > 0 and len(b.cells) > 0) and a.cells.issubset(b.cells) # eliminar conjuntos vazios
     
-    # apply matrix operation
+    # nota: aplicar operação com matriz
     def get_neighboring(self, cell: tuple):
         neighboring = set()
         for i in range(cell[0] - 1, cell[0] + 2):
