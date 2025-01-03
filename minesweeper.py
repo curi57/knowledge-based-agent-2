@@ -151,26 +151,29 @@ class MinesweeperAI():
             if subset is not None and superset is not None: 
                 print(f"superset: {superset}")
                 print(f"subset: {subset}") 
-
+                
+                # aqui é garantido que o subset não seja um conjunto vazio
                 mines_diff = max(superset.count - subset.count, 0)
-                new_knowledge = Sentence(superset.cells.difference(subset.cells), mines_diff) 
-                #superset = Sentence(superset.cells.difference(subset.cells), mines_diff)  
+                new_sentence = Sentence(superset.cells.difference(subset.cells), mines_diff)  
+
+                if self.knowledge.__contains__(new_sentence):
+                    continue
                 
                 print(f"new_knowledge before update: {superset}")
+
+                self.try_inference(new_sentence) # tenta fazer alguma inferência a partir do novo conhecimento e atualiza toda a base de conhecimento caso positivo
+                for y in self.knowledge:
+                    self.try_inference(y) # itera em toda a base de conhecimento após a inferência para tentar propor novos conhecimentos a partir da base antiga atualizada
+
+                self.__raise_knowledge(new_sentence)
+            
+            superset = new_sentence
+
                 
-                # nota: não é necessário atualizar safes e minas para este novo conhecimento pois o mesmo é um subset de uma relação de conhecimentos previamente atualizados
-                # aqui precisamos apenas tentar inferir novas minas ou novos 'safes'
-                needs_update = self.__update_knowledge_base(new_knowledge)
-                if needs_update:
-                    for previous_sentence in self.knowledge:
-                        # verificar também se elementos mais 'antigos' da base de conhecimento podem oferecer algum tipo de inferência para o modelo de aprendizado
-                        self.__update_knowledge_base(previous_sentence) 
-
-                # anti loop-infinito
-                #if not self.knowledge.__contains__(new_knowledge):
-                #self.__create_knowledge(superset)      
-
     def try_inference(self, sentence: Sentence):
+        if len(sentence.cells) == 0:
+            return
+
         if sentence.count == len(sentence.cells):
             for cell in sentence.cells:
                 self.mark_mine(cell)
@@ -198,33 +201,7 @@ class MinesweeperAI():
                                                                                                                                                                             
         return sentence
                                                                                                                                                                                 
-                                                                                                                                                                                
-       def __update_knowledge_base(self, sentence: Sentence) -> bool:                                                                                     
-        
-            # nota: é possível ter uma sentença com zero/ zero?
-                # - é possível que uma sentença que represente um conhecimento prévio que tenha sido atualizado até que ambas as propriedades possuam valor ZERO
-            if len(sentence.cells) == 0:
-                print(f"sentence.cells == 0 must have {sentence.count} value (zero)")
-                return True
-       
-            all_safes = sentence.count == 0 and len(sentence.cells) > 0
-            all_mines = sentence.count > 0 and sentence.count == len(sentence.cells)
-                                                                                                                                                                                
-            if all_safes or all_mines:
-                if all_safes:
-                    cp_cells = sentence.cells.copy()
-                    for cell in cp_cells:
-                        self.mark_safe(cell)                                                                                                                                   
-                elif all_mines:
-                    cp_cells = sentence.cells.copy()
-                    for cell in cp_cells:
-                        self.mark_mine(cell)                                                                                                                              
-                
-                return False 
-                                                                                                                                                                                
-            return True 
-
-
+                                                                                                                                                                        
 
 
 
