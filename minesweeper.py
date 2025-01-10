@@ -118,27 +118,44 @@ class MinesweeperAI():
         self.safes.add(cell)
         for sentence in self.knowledge:
             sentence.mark_safe(cell)
-
+  
     def add_knowledge(self, cell, count):                                                                                                                                             
-     
-        print(f"{cell} - {count}")
-       
+        
+        # debug
+        print(f"{cell} - {count}\n\n")
+
+        for i in self.knowledge:
+            print(f"knowledge -> {i}, \n")
+            for j in i.known_safes():
+                print(f"safes: {j}")
+
+            print("\n")
+
+            for j in i.known_mines():
+                print(f"mines: {j}")
+        # debug
+
+        neighboring = self.get_neighboring(cell)  
+        acquired_sentence = self.__build_acquired_sentence_from_existent_knowledge(neighboring, count) 
+        self.knowledge.append(acquired_sentence)
+ 
         self.moves_made.add(cell) 
         self.mark_safe(cell)         
-        neighboring = self.get_neighboring(cell)
-        acquired_sentence = self.__build_acquired_sentence(neighboring, count)
-        self.try_inference(acquired_sentence)
-
-        if acquired_sentence.count > 0:
-            self.knowledge.append(acquired_sentence) # sentence já adicionada (?)
-
-            if len(self.knowledge) >= 1:
-                self.__raise_knowledge(acquired_sentence)
-    
-       
-    def __raise_knowledge(self, new_sentence: Sentence):
         
+        self.propagate_knowledge(acquired_sentence)
+        
+        has_min_knowledge = len(self.knowledge) > 1
+        if has_min_knowledge:
+            self.__exploit(acquired_sentence)
+    
+
+    def __exploit(self, new_sentence: Sentence):  
+        
+        new_inferences = [] 
         for sentence in self.knowledge:
+            
+            print(f"sentence [iteration]: {sentence}\n\n")
+
             subset = None
             superset = None        
             if self.is_proper_subset(new_sentence, sentence): 
@@ -148,41 +165,40 @@ class MinesweeperAI():
                 superset = new_sentence
                 subset = sentence 
             
-            if subset is not None and superset is not None: 
+            if subset is not None and superset is not None:
+                print("\n\n")
                 print(f"superset: {superset}")
                 print(f"subset: {subset}") 
                 
-                # aqui é garantido que o subset não seja um conjunto vazio
                 mines_diff = max(superset.count - subset.count, 0)
-                new_sentence = Sentence(superset.cells.difference(subset.cells), mines_diff)  
+                superset.cells.intersection_update(subset.cells)
+                superset.count = mines_diff
 
-                if self.knowledge.__contains__(new_sentence):
-                    continue
+                #if self.knowledge.__contains__(inference_sentence):
+                #    continue
                 
-                print(f"new_knowledge before update: {superset}")
-
-                self.try_inference(new_sentence) # tenta fazer alguma inferência a partir do novo conhecimento e atualiza toda a base de conhecimento caso positivo
-                for y in self.knowledge:
-                    self.try_inference(y) # itera em toda a base de conhecimento após a inferência para tentar propor novos conhecimentos a partir da base antiga atualizada
-
-                self.__raise_knowledge(new_sentence)
-            
-            superset = new_sentence
-
+                self.propagate_knowledge(superset)
+                #self.propagate_knowledge(subset)
                 
-    def try_inference(self, sentence: Sentence):
-        if len(sentence.cells) == 0:
-            return
+                self.__exploit(superset)
+        
+            if subset is not None:
+                new_inferences.append(subset)
 
-        if sentence.count == len(sentence.cells):
-            for cell in sentence.cells:
-                self.mark_mine(cell)
+        self.knowledge.extend(new_inferences)
+   
+
+    def propagate_knowledge(self, sentence: Sentence):
+          
         if sentence.count == 0 and len(sentence.cells) > 0:
-            for cell in sentence.cells:
+            for cell in sentence.cells.copy():
                 self.mark_safe(cell)
+        elif sentence.count == len(sentence.cells):
+            for cell in sentence.cells.copy():
+                self.mark_mine(cell)
 
  
-    def __build_acquired_sentence(self, neighboring: set, count: int) -> Sentence:
+    def __build_acquired_sentence_from_existent_knowledge(self, neighboring: set, count: int) -> Sentence:
         
         unknown = set()
         safes = set()
@@ -190,7 +206,7 @@ class MinesweeperAI():
         for cell in neighboring:
             if self.safes.__contains__(cell):
                 safes.add(cell)
-            if self.mines.__contains__(cell):
+            elif self.mines.__contains__(cell):
                 mines.add(cell)
             else:
                 unknown.add(cell)
@@ -200,67 +216,12 @@ class MinesweeperAI():
         sentence.mines = mines 
                                                                                                                                                                             
         return sentence
-                                                                                                                                                                                
-                                                                                                                                                                        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-     
+   
     def is_proper_subset(self, a: Sentence, b: Sentence):
-        return a != b and (len(a.cells) > 0 and len(b.cells) > 0) and a.cells.issubset(b.cells) # eliminar conjuntos vazios
+        return a != b and not self.is_empty_set(a.cells) and not self.is_empty_set(b.cells) and a.cells.issubset(b.cells) # eliminar conjuntos vazios
+
+    def is_empty_set(self, s: set):
+        return len(s) == 0
     
     # nota: aplicar operação com matriz
     def get_neighboring(self, cell: tuple):
@@ -308,3 +269,14 @@ class MinesweeperAI():
         
 
 
+# updates a single sentence
+#def update_sentence(self, sentence: Sentence):
+#    if sentence.count == 0 and len(sentence.cells) > 0:
+#        for cell in sentence.cells:
+#            sentence.safes.add(cell)
+#            sentence.safes.remove(cell)
+#    elif sentence.count == len(sentence.cells):
+#        for cell in sentence.cells:
+#            sentence.mines.add(cell)
+#            sentence.cells.remove(cell)
+#            sentence.count = sentence.count -1
