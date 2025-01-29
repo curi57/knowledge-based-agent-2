@@ -91,13 +91,13 @@ class Sentence():
         return self.safes        
         
     def mark_mine(self, cell):
-        if cell in self.cells:
+        if self.cells.__contains__(cell):
             self.mines.add(cell)
             self.cells.remove(cell)
             self.count = self.count - 1
 
     def mark_safe(self, cell):    
-        if cell in self.cells:
+        if self.cells.__contains__(cell):
             self.safes.add(cell)
             self.cells.remove(cell)
 
@@ -125,18 +125,14 @@ class MinesweeperAI():
         self.safes.add(cell)
         for sentence in self.knowledge:
             sentence.mark_safe(cell)
-    
+
+    def knowledge_repr(self):
+        print("--------------------------------------------------------------------------------------")
+        for sentence in self.knowledge:
+            print(f"sentence: {sentence}")
+        print("--------------------------------------------------------------------------------------")
 
 
-    # 1. Importante ter atenção com o que será executado neste bloco de código abaixo, que está condicionado a existência de algum
-    # elemento dentro de 'acquired_sentence'. Se for algo que necessita ser executado incodicionalmente precisa estar fora do bloco ou após o bloco. 
-                                                                                                                                                      
-    # 2. Um bom exemplo é a iteração em todos os elementos do conjunto de conhecimento para verificar se há alguma revelação sobre o estado do board
-    # após as propagações de conhecimento que foram realizadas. Neste caso são 3:
-        # 2.1 - self.mark_safe(cell)
-        # 2.2 - propagação de conhecimento caso o novo conjunto revelado possua atributos que possibilitem determinar se todos os elementos
-        # contidos nele são minas ou seguras 
-        # 2.3 - propagações que são feitas na combinação de conjuntos e identificação de relações de superconjuntos e subconjuntos
     def add_knowledge(self, cell, count):                                                                                                                                             
         
         print("---------------------------------------------------------------------------------------")
@@ -182,7 +178,8 @@ class MinesweeperAI():
             if not propagated:
                 self.__try_create_new_knowledge(acquired_sentence)
 
-        print(f"Knowledge before propagation completion: {self.knowledge}")
+        print(f"Knowledge before propagation completion:")
+        self.knowledge_repr()
     
         # Finalizar propagação do conhecimento em todas as sentenças da base de conhecimento
         for sentence in self.knowledge:   
@@ -198,7 +195,8 @@ class MinesweeperAI():
                 for cell in sentence.cells.copy():
                     self.mark_mine(cell)
              
-        print(f"Knowledge after propagation completion: {self.knowledge}")
+        print(f"Knowledge after propagation completion:")
+        self.knowledge_repr()
 
         print(f"know mines: {self.mines}")
         print(f"know safes: {self.safes}")   
@@ -206,12 +204,11 @@ class MinesweeperAI():
      
     def __try_create_new_knowledge(self, new_sentence: Sentence):  
         
-        inferences = []
-
+        new_knowledge = []
         if len(self.knowledge):
             for sentence in self.knowledge:        
                 print("\n")
-                print(f"iterarion sentence: {sentence}\n")
+                print(f"iteration sentence: {sentence}\n")
                 print(f"new sentence: {new_sentence}\n") 
 
                 print("\n\n")
@@ -219,8 +216,10 @@ class MinesweeperAI():
                 superset = self.is_proper_subset(new_sentence, sentence)            
                 if superset is not None: 
                     print(f"superset: {superset}")
+                    
+                    # Verificar contexto da chamada deste método
                     if superset == new_sentence:
-                        inferences.append(superset)
+                        new_knowledge.append(superset)
                     
                     unknown_cells = len(superset.cells) 
                     all_safes = not superset.count and unknown_cells  
@@ -239,13 +238,15 @@ class MinesweeperAI():
                     if keep_comparing:
                         self.__try_create_new_knowledge(superset)
                     
+                    # Verificar contexto de chamada deste método 2
                     if self.is_valid_sentence(superset):
-                        inferences.append(superset)
+                        new_knowledge.append(superset)
                 else:
                     print(f"No relation for new_sentence: {new_sentence}")
-                    self.knowledge.append(new_sentence)
- 
-            self.knowledge.extend(inferences)
+                    new_knowledge.append(new_sentence)
+            
+            if len(new_knowledge):
+                self.knowledge.extend(new_knowledge)
         else:
             self.knowledge.append(new_sentence)
 
@@ -275,7 +276,7 @@ class MinesweeperAI():
     # na iteração para atualização após uma nova jogada 
     # (2) Tanto a sentença que está sendo iterada quando a nova sentença são testadas antes da iteração acontecer
     def is_proper_subset(self, a: Sentence, b: Sentence) -> Sentence | None:  
-        if a != b:
+        if not a.__eq__(b):
             if a.cells.issubset(b.cells):
                 
                 print(f"subset: {a}") 
