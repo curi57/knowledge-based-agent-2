@@ -125,7 +125,18 @@ class MinesweeperAI():
         self.safes.add(cell)
         for sentence in self.knowledge:
             sentence.mark_safe(cell)
-  
+    
+
+
+    # 1. Importante ter atenção com o que será executado neste bloco de código abaixo, que está condicionado a existência de algum
+    # elemento dentro de 'acquired_sentence'. Se for algo que necessita ser executado incodicionalmente precisa estar fora do bloco ou após o bloco. 
+                                                                                                                                                      
+    # 2. Um bom exemplo é a iteração em todos os elementos do conjunto de conhecimento para verificar se há alguma revelação sobre o estado do board
+    # após as propagações de conhecimento que foram realizadas. Neste caso são 3:
+        # 2.1 - self.mark_safe(cell)
+        # 2.2 - propagação de conhecimento caso o novo conjunto revelado possua atributos que possibilitem determinar se todos os elementos
+        # contidos nele são minas ou seguras 
+        # 2.3 - propagações que são feitas na combinação de conjuntos e identificação de relações de superconjuntos e subconjuntos
     def add_knowledge(self, cell, count):                                                                                                                                             
         
         print("---------------------------------------------------------------------------------------")
@@ -133,173 +144,113 @@ class MinesweeperAI():
         # debug
         print(f"{cell} - {count}\n")  
         # debug
-
-        self.moves_made.add(cell) # este atributo serve apenas para controle de movimentos do jogo 
-        self.mark_safe(cell) # propagação de conhecimento simples
+    
+        # Este atributo serve apenas para controle de movimentos do jogo 
+        self.moves_made.add(cell)         
+        # Marcando a célula revelada como segura e propagando 
+        self.mark_safe(cell) 
 
         neighboring = self.get_neighboring(cell)  
 
         # Aqui a sentença pode ser esvaziada após cruzamento de dados com a base de conhecimento que mantém as células já
         # reveladas e os seus valores 
         acquired_sentence = self.__build_acquired_sentence_from_existent_knowledge(neighboring, count) 
-        
-        # Importante ter atenção com o que será executado neste bloco de código abaixo, que está condicionado a existência de algum
-        # elemento dentro de 'acquired_sentence'. Se for algo que precisa ser executado precisa estar fora do bloco. Um bom exemplo
-        # é a iteração em todos os elementos do conjunto de conhecimento para verificar se há alguma revelação sobre o estado do board
-        # após as propagações de conhecimento que foram realizadas. Neste caso são 3:
-        # 1 - self.mark_safe(cell)
-        # 2 - propagação de conhecimento caso o novo conjunto revelado possua atributos que possibilitem determinar se todos os elementos
-        # contidos nele são minas ou seguras 
-        # 3 - propagações que são feitas na combinação de conjuntos e identificação de relações de superconjuntos e subconjuntos
-        if (len(acquired_sentence.cells)):        
-            propagated = self.propagate_knowledge(acquired_sentence, cell)
 
-            if not propagated and len(self.knowledge) > 1:
-                self.__make_deduction(acquired_sentence)
-        
-        for knowledge_set in self.knowledge:    
-            set_len = len(knowledge_set.cells)
-            set_count = knowledge_set.count 
+        sentence_size = len(acquired_sentence.cells) 
+        if (sentence_size):        
+            print("----------------------------------------------------------")    
             
-            if not set_count and set_len:
-                for cell in knowledge_set.cells.copy():
+            print("Try to inference and propagate new knowledge:")
+            print(f"acquired_sentence: {acquired_sentence}")
+            
+            print("----------------------------------------------------------")
+                      
+            all_safes = not acquired_sentence.count  
+            all_mines = acquired_sentence.count == sentence_size                                         
+            propagated = False                                                                                           
+            if all_safes:
+                # Aqui a iteração é feita na cópia pois o método mark_safe altera a estrutura de células das sentenças já produzidas na base de conhecimento
+                # A cópia é realmente necessária? O conhecimento adquirido ainda não foi adicionada a base de conhecimento neste ponto do código
+                for cell in acquired_sentence.cells:
                     self.mark_safe(cell)
-            if set_len and set_len == set_count:
-                for cell in knowledge_set.cells.copy():
+                propagated = True 
+            elif all_mines:
+                for cell in acquired_sentence.cells:
                     self.mark_mine(cell)
+                propagated = True 
+                                                                                                 
+            if not propagated:
+                self.__try_create_new_knowledge(acquired_sentence)
+
+        print(f"Knowledge before propagation completion: {self.knowledge}")
+    
+        # Finalizar propagação do conhecimento em todas as sentenças da base de conhecimento
+        for sentence in self.knowledge:   
+            
+            unknown_cells = len(sentence.cells)
+            
+            all_safes = not sentence.count and unknown_cells  
+            all_mines = sentence.count == unknown_cells                                                                              
+            if all_safes:  
+                for cell in sentence.cells.copy():
+                    self.mark_safe(cell)
+            elif all_mines:
+                for cell in sentence.cells.copy():
+                    self.mark_mine(cell)
+             
+        print(f"Knowledge after propagation completion: {self.knowledge}")
 
         print(f"know mines: {self.mines}")
         print(f"know safes: {self.safes}")   
 
+     
+    def __try_create_new_knowledge(self, new_sentence: Sentence):  
         
-    # 1.0 - Atualização da base (tentando afirmar valores (antes) incertos)  
-    # 1.1 - Propagação de certezas (utiliza os elementos adjacentes)                                     
-    def propagate_knowledge(self, sentence: Sentence, cell):                                         
-                                                                                                    
-        print("----------------------------------------------------------")    
-        print("PROPAGATE KNOWLEDGE:")
-        print(f"sentence: {sentence}")
-        print("----------------------------------------------------------")
-           
-        # A sentença poderá ser vazia após o cruzamento dos dados de células da nova sentença com
-        # a base de conhecimento que representa as células já reveladas (minas ou seguras)
-        print(f"sentence.cells: {sentence.cells}")
-        print(f"sentence.count: {sentence.count}")
-             
-        all_safes = sentence.count == 0 and len(sentence.cells) > 0
-        all_mines = sentence.count == len(sentence.cells)
-                                                                                      
-        propagated = False
-        if (all_safes or all_mines):
-            propagated = True 
+        inferences = []
 
-        if all_safes:
-            for cell in sentence.cells.copy():
-                self.mark_safe(cell)
-        elif all_mines:
-            for cell in sentence.cells.copy():
-                self.mark_mine(cell)
-                                                                                             
-        return propagated
-                                                                                                  
-         
-    def __make_deduction(self, new_sentence: Sentence):  
-        
-        # representa todas as sentenças com conjuntos que possuem relação de interseção com a nova sentença 
-        # mas que não possuem relação de interseção entre si, formando assim, no melhor das hipóteses, um superconjunto da nova sentença
-        multiple_sentence_combination = Sentence(set(), 0)
- 
-        # representa todas as sentenas com conjuntos que possuem relação de interseção com a nova sentença                                     
-        # e com a combinação de múltiplas sentenças, formando assim, no melhor das hipóteses, um subconjunto da nova sentença
-        multiple_sentence_difference = Sentence(set(), 0)
-        
-        new_inferences = []
-        for sentence in self.knowledge:
-            
-            print("\n")
-            print(f"new sentence: {new_sentence}\n\n") 
-            print(f"iterarion sentence: {sentence}\n\n")
-
-            if self.is_empty_set(sentence.cells, sentence.count):
-                continue
-
-            subset = None
-            superset = None        
-            if self.is_proper_subset(new_sentence, sentence): 
-                subset = new_sentence
-                superset = sentence 
-            elif self.is_proper_subset(sentence, new_sentence): 
-                superset = new_sentence
-                subset = sentence 
-            else:
+        if len(self.knowledge):
+            for sentence in self.knowledge:        
                 print("\n")
-                print(f"Combination sentence [1]: {multiple_sentence_combination}")
-                # i still don't know if it could be better to keep building the combination sentence even if there superset/subset relation have been found 
-                if (len(multiple_sentence_combination.cells.intersection(sentence.cells)) == 0 and len(sentence.cells.intersection(new_sentence.cells))):
-                    multiple_sentence_combination.cells = multiple_sentence_combination.cells.union(sentence.cells)
-                    multiple_sentence_combination.count = multiple_sentence_combination.count + sentence.count
+                print(f"iterarion sentence: {sentence}\n")
+                print(f"new sentence: {new_sentence}\n") 
 
-                    print(f"Combination sentence [2]: {multiple_sentence_combination}")
- 
-                    if self.is_proper_subset(multiple_sentence_combination, new_sentence): 
-                        subset_from_combination = new_sentence # já faz parte da base de conhecimento 
-                        combination_superset = multiple_sentence_combination
-                        
-                        mines_diff = max(combination_superset.count - subset_from_combination.count, 0)
-                        combination_superset.cells.difference_update(subset_from_combination.cells)
-                        combination_superset.count = mines_diff
-
-                        if self.knowledge.__contains__(combination_superset):
-                            continue 
-
-                        new_inferences.append(multiple_sentence_combination)
-
-                        propagated = self.propagate_knowledge(combination_superset) 
-                        if not propagated:
-                            self.__make_deduction(combination_superset)
-
-                        
-                    if self.is_proper_subset(new_sentence, multiple_sentence_combination): 
-                        superset_from_sentence = new_sentence # já faz parte da base de conhecimento
-                        combination_subset = multiple_sentence_combination # mesmo caso acima, porém ao contrário
-
-                        mines_diff = max(superset_from_sentence.count - combination_subset.count, 0)
-                        superset_from_sentence.cells.difference_update(combination_subset.cells)
-                        superset_from_sentence.count = mines_diff
-
-                        if self.knowledge.__contains__(superset_from_sentence):
-                            continue
-
-                        keep_comparing = not self.propagate_knowledge(superset_from_sentence) 
-                        if keep_comparing:
-                            self.__make_deduction(superset_from_sentence)
-
-                        keep_comparing = not self.propagate_knowledge(combination_subset) 
-                        if keep_comparing:
-                            self.__make_deduction(combination_subset)
-
-                    elif not len(multiple_sentence_difference.cells.intersection(sentence.cells)):
-                        multiple_sentence_difference.cells.union(sentence.cells)
-                        multiple_sentence_difference.count = multiple_sentence_difference.count + sentence.count
-
-            if subset is not None and superset is not None:
-                
                 print("\n\n")
-                print(f"superset: {superset}")
-                print(f"subset: {subset}") 
-                
-                mines_diff = max(superset.count - subset.count, 0)
-                superset.cells.difference_update(subset.cells)
-                superset.count = mines_diff
 
-                #new_inferences.append(superset) -> vai duplicar
-  
-                keep_comparing = self.propagate_knowledge(superset) 
-                if keep_comparing:
-                    self.__make_deduction(superset)
-          
-        self.knowledge.extend(new_inferences)
+                superset = self.is_proper_subset(new_sentence, sentence)            
+                if superset is not None: 
+                    print(f"superset: {superset}")
+                    if superset == new_sentence:
+                        inferences.append(superset)
+                    
+                    unknown_cells = len(superset.cells) 
+                    all_safes = not superset.count and unknown_cells  
+                    all_mines = superset.count == unknown_cells     
+                    deducted_and_propagated = False 
+                    if all_safes:  
+                        for cell in superset.cells.copy():
+                            self.mark_safe(cell)
+                        deducted_and_propagated = True 
+                    elif all_mines:
+                        for cell in superset.cells.copy():
+                            self.mark_mine(cell)
+                        deducted_and_propagated = True
+
+                    keep_comparing = not deducted_and_propagated
+                    if keep_comparing:
+                        self.__try_create_new_knowledge(superset)
+                    
+                    if self.is_valid_sentence(superset):
+                        inferences.append(superset)
+                else:
+                    print(f"No relation for new_sentence: {new_sentence}")
+                    self.knowledge.append(new_sentence)
  
+            self.knowledge.extend(inferences)
+        else:
+            self.knowledge.append(new_sentence)
+
+
+
     def __build_acquired_sentence_from_existent_knowledge(self, neighboring: set, count: int) -> Sentence:
         
         unknown = set()
@@ -319,18 +270,44 @@ class MinesweeperAI():
                                                                                                                                      
         return sentence
    
-    def is_proper_subset(self, a: Sentence, b: Sentence):
-        return a != b and not self.is_empty_set(a.cells, a.count) and not self.is_empty_set(b.cells, b.count) and a.cells.issubset(b.cells) # eliminar conjuntos vazios
 
-    def is_empty_set(self, s: set, count):
-        if len(s) == 0:
-            if count != 0:
-                raise Exception("Empty set must have a count value of zero")
-            return True
+    # (1) Conjuntos não vazios e que já fazem parte da base de conhecimento podem se tornar conjuntos vazios 
+    # na iteração para atualização após uma nova jogada 
+    # (2) Tanto a sentença que está sendo iterada quando a nova sentença são testadas antes da iteração acontecer
+    def is_proper_subset(self, a: Sentence, b: Sentence) -> Sentence | None:  
+        if a != b:
+            if a.cells.issubset(b.cells):
+                
+                print(f"subset: {a}") 
+
+                mines_diff = max(b.count - a.count, 0)
+                b.cells.difference_update(a.cells)
+                b.count = mines_diff
+
+                return b
+            elif b.cells.issubset(a.cells):
+ 
+                print(f"subset: {b}")
+
+                mines_diff = max(a.count - b.count, 0)
+                a.cells.difference_update(b.cells)
+                a.count = mines_diff
+
+                return a
         
+        return None 
+        #return a != b and a.cells.issubset(b.cells) 
+
+    def is_valid_sentence(self, s: Sentence):
+        if len(s.cells) > 0:
+            return True 
+
+        if s.count != 0:
+            raise Exception("Empty sentence must have a count value of zero")
+
         return False
-    
-    # nota: aplicar operação com matriz
+            
+    # Aplicar operação com matriz
     def get_neighboring(self, cell: tuple):
         neighboring = set()
         for i in range(cell[0] - 1, cell[0] + 2):
@@ -374,16 +351,53 @@ class MinesweeperAI():
   
         
         
-
-
-
-
-
-
-
-
-
-
-
-
-
+#else:
+#    print("\n")
+#    print(f"Combination sentence [1]: {multiple_sentence_combination}")
+#    # i still don't know if it could be better to keep building the combination sentence even if there superset/subset relation have been found 
+#    if (len(multiple_sentence_combination.cells.intersection(sentence.cells)) == 0 and len(sentence.cells.intersection(new_sentence.cells))):
+#        multiple_sentence_combination.cells = multiple_sentence_combination.cells.union(sentence.cells)
+#        multiple_sentence_combination.count = multiple_sentence_combination.count + sentence.count
+#                                                                                                                                                 
+#        print(f"Combination sentence [2]: {multiple_sentence_combination}")
+#                                                                                                                                                 
+#        if self.is_proper_subset(multiple_sentence_combination, new_sentence): 
+#            subset_from_combination = new_sentence # já faz parte da base de conhecimento 
+#            combination_superset = multiple_sentence_combination
+#            
+#            mines_diff = max(combination_superset.count - subset_from_combination.count, 0)
+#            combination_superset.cells.difference_update(subset_from_combination.cells)
+#            combination_superset.count = mines_diff
+#                                                                                                                                                 
+#            if self.knowledge.__contains__(combination_superset):
+#                continue 
+#                                                                                                                                                 
+#            new_inferences.append(multiple_sentence_combination)
+#                                                                                                                                                 
+#            propagated = self.propagate_knowledge(combination_superset) 
+#            if not propagated:
+#                self.__make_deduction(combination_superset)
+#                                                                                                                                                 
+#            
+#        if self.is_proper_subset(new_sentence, multiple_sentence_combination): 
+#            superset_from_sentence = new_sentence # já faz parte da base de conhecimento
+#            combination_subset = multiple_sentence_combination # mesmo caso acima, porém ao contrário
+#                                                                                                                                                 
+#            mines_diff = max(superset_from_sentence.count - combination_subset.count, 0)
+#            superset_from_sentence.cells.difference_update(combination_subset.cells)
+#            superset_from_sentence.count = mines_diff
+#                                                                                                                                                 
+#            if self.knowledge.__contains__(superset_from_sentence):
+#                continue
+#                                                                                                                                                 
+#            keep_comparing = not self.propagate_knowledge(superset_from_sentence) 
+#            if keep_comparing:
+#                self.__make_deduction(superset_from_sentence)
+#                                                                                                                                                 
+#            keep_comparing = not self.propagate_knowledge(combination_subset) 
+#            if keep_comparing:
+#                self.__make_deduction(combination_subset)
+#                                                                                                                                                 
+#        elif not len(multiple_sentence_difference.cells.intersection(sentence.cells)):
+#            multiple_sentence_difference.cells.union(sentence.cells)
+#            multiple_sentence_difference.count = multiple_sentence_difference.count + sentence.count
