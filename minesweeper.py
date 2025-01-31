@@ -151,107 +151,111 @@ class MinesweeperAI():
         # Aqui a sentença pode ser esvaziada após cruzamento de dados com a base de conhecimento que mantém as células já
         # reveladas e os seus valores 
         acquired_sentence = self.__build_acquired_sentence_from_existent_knowledge(neighboring, count) 
+        
+        print(f"acquired_sentence: {acquired_sentence}")
 
-        sentence_size = len(acquired_sentence.cells) 
-        if (sentence_size):        
-            print("----------------------------------------------------------")    
-            
+        unknown = len(acquired_sentence.cells) 
+        no_mines = not acquired_sentence.count
+        all_safes = unknown and no_mines 
+        all_mines = not no_mines and (acquired_sentence.count == unknown)
+        propagated = False                                                                                          
+        self.knowledge.append(acquired_sentence)
+        acquired_sentence_cells_cp = acquired_sentence.cells.copy()
+        if all_safes:  
+            for cell in acquired_sentence_cells_cp:
+
+                # Sentence is still not part of the knowledge base 
+                #acquired_sentence.cells.remove(cell)
+                #acquired_sentence.safes.add(cell)
+                self.mark_safe(cell)
+            propagated = True 
+        elif all_mines:
+            for cell in acquired_sentence_cells_cp:
+
+                # Sentence is still not part of the knowledge base 
+                #acquired_sentence.cells.remove(cell)
+                #acquired_sentence.mines.add(cell)
+                #acquired_sentence.count = acquired_sentence.count - 1
+
+                self.mark_mine(cell)
+            propagated = True 
+        
+        if not propagated:        
+            print("----------------------------------------------------------") 
             print("Try to inference and propagate new knowledge:")
-            print(f"acquired_sentence: {acquired_sentence}")
-            
             print("----------------------------------------------------------")
-                      
-            all_safes = not acquired_sentence.count  
-            all_mines = acquired_sentence.count == sentence_size                                         
-            propagated = False                                                                                           
-            if all_safes:
-                # Aqui a iteração é feita na cópia pois o método mark_safe altera a estrutura de células das sentenças já produzidas na base de conhecimento
-                # A cópia é realmente necessária? O conhecimento adquirido ainda não foi adicionada a base de conhecimento neste ponto do código
-                for cell in acquired_sentence.cells:
-                    self.mark_safe(cell)
-                propagated = True 
-            elif all_mines:
-                for cell in acquired_sentence.cells:
-                    self.mark_mine(cell)
-                propagated = True 
-                                                                                                 
-            if not propagated:
-                self.__try_create_new_knowledge(acquired_sentence)
+            self.__try_create_new_knowledge(acquired_sentence)
 
-        print(f"Knowledge before propagation completion:")
+            
+        print(f"[DEBUG] Knowledge before propagation completion:")
         self.knowledge_repr()
-    
+        print(f"[DEBUG]")
+ 
         # Finalizar propagação do conhecimento em todas as sentenças da base de conhecimento
         for sentence in self.knowledge:   
             
-            unknown_cells = len(sentence.cells)
-            
-            all_safes = not sentence.count and unknown_cells  
-            all_mines = sentence.count == unknown_cells                                                                              
+            unknown = len(sentence.cells) 
+            no_mines = not sentence.count
+            all_safes = unknown and no_mines 
+            all_mines = not no_mines and (sentence.count == unknown)
+ 
+            sentence_cells_cp = sentence.cells.copy()
             if all_safes:  
-                for cell in sentence.cells.copy():
+                for cell in sentence_cells_cp:
                     self.mark_safe(cell)
             elif all_mines:
-                for cell in sentence.cells.copy():
+                for cell in sentence_cells_cp:
                     self.mark_mine(cell)
              
         print(f"Knowledge after propagation completion:")
         self.knowledge_repr()
 
-        print(f"know mines: {self.mines}")
-        print(f"know safes: {self.safes}")   
+        print(f"self.mines: {self.mines}")
+        print(f"self.safes: {self.safes}")   
 
-     
+
     def __try_create_new_knowledge(self, new_sentence: Sentence):  
-        
-        new_knowledge = []
-        if len(self.knowledge):
-            for sentence in self.knowledge:        
-                print("\n")
-                print(f"iteration sentence: {sentence}\n")
-                print(f"new sentence: {new_sentence}\n") 
+      
+        for sentence in self.knowledge:        
+            print("\n")
+            print(f"iteration sentence: {sentence}\n")
+            print(f"new sentence: {new_sentence}\n") 
 
-                print("\n\n")
-
-                superset = self.is_proper_subset(new_sentence, sentence)            
-                if superset is not None: 
-                    print(f"superset: {superset}")
-                    
-                    # Verificar contexto da chamada deste método
-                    if superset == new_sentence:
-                        new_knowledge.append(superset)
-                    
-                    unknown_cells = len(superset.cells) 
-                    all_safes = not superset.count and unknown_cells  
-                    all_mines = superset.count == unknown_cells     
-                    deducted_and_propagated = False 
-                    if all_safes:  
-                        for cell in superset.cells.copy():
-                            self.mark_safe(cell)
-                        deducted_and_propagated = True 
-                    elif all_mines:
-                        for cell in superset.cells.copy():
-                            self.mark_mine(cell)
-                        deducted_and_propagated = True
-
-                    keep_comparing = not deducted_and_propagated
-                    if keep_comparing:
-                        self.__try_create_new_knowledge(superset)
-                    
-                    # Verificar contexto de chamada deste método 2
-                    if self.is_valid_sentence(superset):
-                        new_knowledge.append(superset)
-                else:
-                    print(f"No relation for new_sentence: {new_sentence}")
-                    new_knowledge.append(new_sentence)
+            print("\n\n")
             
-            if len(new_knowledge):
-                self.knowledge.extend(new_knowledge)
-        else:
-            self.knowledge.append(new_sentence)
+            # Ou a sentença ou a nova sentença será o Superset (ou não haverá relação entre os conjuntos)
+    
+            # 1. Caso a sentença seja o superset ela será atualizada na diferença com o subset (nova sentença). Para garantir
+            # que a nova sentença seja inserida na base de conhecimento sem duplicata, devemos realizar todas as iterações para apenas no final adicionar a estrutura
 
+            # 2. Caso a nova sentença seja o superset, a sentença (subset) continua inalterada e podemos seguir a mesma diretriz para o caso acima, deixando para adicionar a nova senteça que terá sido modificada ou terá modificado durantes as iterações e provavelmente chegará ao final do método com menos elementos e com propriedades diferentes
+            superset = self.is_proper_subset(new_sentence, sentence)            
+            if superset is not None: 
+                print(f"superset: {superset}")
+                
+                unknown = len(superset.cells) 
+                no_mines = not superset.count
+                all_safes = unknown and no_mines 
+                all_mines = not no_mines and (superset.count == unknown)  
+                deducted_and_propagated = False 
 
+                superset_cells_cp = superset.cells.copy();
+                if all_safes:  
+                    for cell in superset_cells_cp:
+                        self.mark_safe(cell)
+                    deducted_and_propagated = True 
+                elif all_mines:
+                    for cell in superset_cells_cp:
+                        self.mark_mine(cell)
+                    deducted_and_propagated = True
 
+                keep_comparing = not deducted_and_propagated
+                if keep_comparing:
+                    self.__try_create_new_knowledge(superset)  
+            else:
+                print(f"No relation for new_sentence: {new_sentence}")
+
+        
     def __build_acquired_sentence_from_existent_knowledge(self, neighboring: set, count: int) -> Sentence:
         
         unknown = set()
@@ -267,8 +271,11 @@ class MinesweeperAI():
         
         sentence = Sentence(unknown, count - len(mines))
         sentence.safes = safes
-        sentence.mines = mines 
-                                                                                                                                     
+        sentence.mines = mines
+
+        print(f"sentence.known_mines: {sentence.known_mines()}")
+        print(f"sentence.known_safes: {sentence.known_safes()}")
+                                                                                                                             
         return sentence
    
 
