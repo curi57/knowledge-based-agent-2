@@ -156,28 +156,25 @@ class MinesweeperAI():
 
         unknown = len(acquired_sentence.cells) 
         no_mines = not acquired_sentence.count
+      
+        propagated = False                                                                                          
+        
+        # Adicionando conhecimento adquirido à KB
+        self.knowledge.append(acquired_sentence)
+
+        acquired_sentence_cells_cp = acquired_sentence.cells.copy()
         all_safes = unknown and no_mines 
         all_mines = not no_mines and (acquired_sentence.count == unknown)
-        propagated = False                                                                                          
-        self.knowledge.append(acquired_sentence)
-        acquired_sentence_cells_cp = acquired_sentence.cells.copy()
         if all_safes:  
-            for cell in acquired_sentence_cells_cp:
-
-                # Sentence is still not part of the knowledge base 
-                #acquired_sentence.cells.remove(cell)
-                #acquired_sentence.safes.add(cell)
+            for cell in acquired_sentence_cells_cp:  
                 self.mark_safe(cell)
+            
             propagated = True 
+
         elif all_mines:
             for cell in acquired_sentence_cells_cp:
-
-                # Sentence is still not part of the knowledge base 
-                #acquired_sentence.cells.remove(cell)
-                #acquired_sentence.mines.add(cell)
-                #acquired_sentence.count = acquired_sentence.count - 1
-
                 self.mark_mine(cell)
+
             propagated = True 
         
         if not propagated:        
@@ -215,8 +212,13 @@ class MinesweeperAI():
 
 
     def __try_create_new_knowledge(self, new_sentence: Sentence):  
-      
-        for sentence in self.knowledge:        
+        
+        for sentence in self.knowledge:       
+            
+            # Evita comparar novas sentenças com conjuntos que já foram totalmente revelados (vazios)
+            if not len(sentence.cells):
+                continue
+
             print("\n")
             print(f"iteration sentence: {sentence}\n")
             print(f"new sentence: {new_sentence}\n") 
