@@ -189,6 +189,27 @@ class MinesweeperAI():
         print(f"[DEBUG]")
  
         # Finalizar propagação do conhecimento em todas as sentenças da base de conhecimento
+        #can_take_conclusions = True
+        #index = 0
+        #while can_take_conclusions:
+        #    
+        #    if index <= len(self.knowledge):
+
+        #        sentence = self.knowledge[index]
+        #        
+        #        unknown = len(sentence.cells) 
+        #        no_mines = not sentence.count
+        #        all_safes = unknown and no_mines 
+        #        all_mines = not no_mines and (sentence.count == unknown)
+        #                                                                 
+        #        sentence_cells_cp = sentence.cells.copy()
+        #        if all_safes:  
+        #            for cell in sentence_cells_cp:
+        #                self.mark_safe(cell)
+        #        elif all_mines:
+        #            for cell in sentence_cells_cp:
+        #                self.mark_mine(cell)
+
         for sentence in self.knowledge:   
             
             unknown = len(sentence.cells) 
@@ -203,14 +224,33 @@ class MinesweeperAI():
             elif all_mines:
                 for cell in sentence_cells_cp:
                     self.mark_mine(cell)
+
+            print(f"sentence.known_mines: {sentence.known_mines()}")
+            print(f"sentence.known_safes: {sentence.known_safes()}")
+
              
         print(f"Knowledge after propagation completion:")
         self.knowledge_repr()
 
-        print(f"self.mines: {self.mines}")
-        print(f"self.safes: {self.safes}")   
+        print(f"self.mines [Total]: {self.mines}")
+        print(f"self.safes [Total]: {self.safes}")   
 
-
+    
+    #unknown = len(superset.cells) -> after updating the superset there is no element inside superset.cells anymore in case of all safes or all mines 
+    #no_mines = not superset.count
+    #all_safes = unknown and no_mines 
+    #all_mines = not no_mines and (superset.count == unknown)  
+    #deducted_and_propagated = False 
+                                                                                                                                                       
+    #superset_cells_cp = superset.cells.copy();
+    #if all_safes:  
+    #    for cell in superset_cells_cp:
+    #        self.mark_safe(cell)
+    #    deducted_and_propagated = True 
+    #elif all_mines:
+    #    for cell in superset_cells_cp:
+    #        self.mark_mine(cell)
+    #    deducted_and_propagated = True
     def __try_create_new_knowledge(self, new_sentence: Sentence):  
         
         for sentence in self.knowledge:       
@@ -234,25 +274,33 @@ class MinesweeperAI():
             superset = self.is_proper_subset(new_sentence, sentence)            
             if superset is not None: 
                 print(f"superset: {superset}")
+
+                revealed_mines = superset.known_mines()
+                revealed_safes = superset.known_safes()
+
+                for revealed in revealed_mines:
+                    self.mark_mine(revealed)
+
+                for revealed in revealed_safes:
+                    self.mark_safe(revealed)
                 
-                unknown = len(superset.cells) 
-                no_mines = not superset.count
-                all_safes = unknown and no_mines 
-                all_mines = not no_mines and (superset.count == unknown)  
-                deducted_and_propagated = False 
+                # After updating the Superset there is not elements left inside the cells property if they're all safes or all mines\
+                
+                # It means unknown will contain the value of 0 and all the cells from the original sentence will be inside the mines or safes structure
+                
+                # I this case all_safes will return False because unknown is 0 (False)
+                
+                # all_mines will propably return False either because not(no_mines) will return False (no_mines is True and not(no_mines) is False) resulting the 
+                # proposition to be False
 
-                superset_cells_cp = superset.cells.copy();
-                if all_safes:  
-                    for cell in superset_cells_cp:
-                        self.mark_safe(cell)
-                    deducted_and_propagated = True 
-                elif all_mines:
-                    for cell in superset_cells_cp:
-                        self.mark_mine(cell)
-                    deducted_and_propagated = True
+                # In both cases deducted_and_propagated will return False and therefore the recursion will be called for a empty sentence, 
+                # wasting time and computational resources. Also, no propagation will be done resulting in wrong outputs.
 
-                keep_comparing = not deducted_and_propagated
-                if keep_comparing:
+                # The question is: How come the propagation for safe cells is happening? (clue: last block of code before terminating the add_knowledge function)
+
+                #keep_comparing = not deducted_and_propagated
+                if len(superset.cells):
+                    # Revisar este retorno (com retorno e sem retorno não faz diferença, deveria fazer?)
                     self.__try_create_new_knowledge(superset)  
             else:
                 print(f"No relation for new_sentence: {new_sentence}")
@@ -274,16 +322,10 @@ class MinesweeperAI():
         sentence = Sentence(unknown, count - len(mines))
         sentence.safes = safes
         sentence.mines = mines
-
-        print(f"sentence.known_mines: {sentence.known_mines()}")
-        print(f"sentence.known_safes: {sentence.known_safes()}")
-                                                                                                                             
+                                                                                                                       
         return sentence
    
-
-    # (1) Conjuntos não vazios e que já fazem parte da base de conhecimento podem se tornar conjuntos vazios 
-    # na iteração para atualização após uma nova jogada 
-    # (2) Tanto a sentença que está sendo iterada quando a nova sentença são testadas antes da iteração acontecer
+  
     def is_proper_subset(self, a: Sentence, b: Sentence) -> Sentence | None:  
         if not a.__eq__(b):
             if a.cells.issubset(b.cells):
