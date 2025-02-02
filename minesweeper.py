@@ -153,69 +153,52 @@ class MinesweeperAI():
         acquired_sentence = self.__build_acquired_sentence_from_existent_knowledge(neighboring, count) 
         
         print(f"acquired_sentence: {acquired_sentence}")
-
-        unknown = len(acquired_sentence.cells) 
-        no_mines = not acquired_sentence.count
-      
-        propagated = False                                                                                          
-        
-        # Adicionando conhecimento adquirido à KB
+        # Adding the sentence to the Knowledge Base 
         self.knowledge.append(acquired_sentence)
+  
+        revealed = False                                                                                          
+        cp = acquired_sentence.cells.copy()
 
-        acquired_sentence_cells_cp = acquired_sentence.cells.copy()
-        all_safes = unknown and no_mines 
-        all_mines = not no_mines and (acquired_sentence.count == unknown)
-        if all_safes:  
-            for cell in acquired_sentence_cells_cp:  
+        # Here we're trying to propagate knowledge from the conclusions about a exclusive sentence
+        if self.__all_safes(acquired_sentence):  
+            for cell in cp:  
                 self.mark_safe(cell)
-            
-            propagated = True 
-
-        elif all_mines:
-            for cell in acquired_sentence_cells_cp:
+            revealed = True 
+        elif self.__all_mines(acquired_sentence):
+            for cell in cp:
                 self.mark_mine(cell)
-
-            propagated = True 
+            revealed = True 
         
-        if not propagated:        
+        # It is possible to have a empty Sentence "here"
+        if not revealed:        
+            
             print("----------------------------------------------------------") 
-            print("Try to inference and propagate new knowledge:")
+            print("Try to create new knowledge:")
             print("----------------------------------------------------------")
-            self.__try_create_new_knowledge(acquired_sentence)
+            
+            self.__create_new_knowledge(acquired_sentence)
 
             
-        print(f"[DEBUG] Knowledge before propagation completion:")
+        print(f"[DEBUG] Knowledge BEFORE propagation completion:")
         self.knowledge_repr()
         print(f"[DEBUG]")
  
         # Finalizar propagação do conhecimento em todas as sentenças da base de conhecimento
-        #can_take_conclusions = True
-        #index = 0
-        #while can_take_conclusions:
-        #    
-        #    if index <= len(self.knowledge):
+        # É este método que permite combinar múltiplas sentenças (?)
 
-        #        sentence = self.knowledge[index]
-        #        
-        #        unknown = len(sentence.cells) 
-        #        no_mines = not sentence.count
-        #        all_safes = unknown and no_mines 
-        #        all_mines = not no_mines and (sentence.count == unknown)
-        #                                                                 
-        #        sentence_cells_cp = sentence.cells.copy()
-        #        if all_safes:  
-        #            for cell in sentence_cells_cp:
-        #                self.mark_safe(cell)
-        #        elif all_mines:
-        #            for cell in sentence_cells_cp:
-        #                self.mark_mine(cell)
+        #:) MinesweeperAI.add_knowledge can infer multiple mines when given new information
+
+        #:( MinesweeperAI.add_knowledge can infer safe cells when given new information [Erro]
+        #did not find (0, 0) in safe cells when possible to conclude safe
+        
+        #:) MinesweeperAI.add_knowledge combines multiple sentences to draw conclusions
 
         for sentence in self.knowledge:   
             
-            unknown = len(sentence.cells) 
-            no_mines = not sentence.count
-            all_safes = unknown and no_mines 
-            all_mines = not no_mines and (sentence.count == unknown)
+            unknowns = len(sentence.cells) # Quantity
+            mines = sentence.count 
+            all_safes = unknowns > 0 and mines == 0 
+            all_mines = mines > 0 and mines == unknowns
  
             sentence_cells_cp = sentence.cells.copy()
             if all_safes:  
@@ -233,58 +216,67 @@ class MinesweeperAI():
         self.knowledge_repr()
 
         print(f"self.mines [Total]: {self.mines}")
-        print(f"self.safes [Total]: {self.safes}")   
+        print(f"self.safes [Total]: {self.safes}")  
 
-    
-    #unknown = len(superset.cells) -> after updating the superset there is no element inside superset.cells anymore in case of all safes or all mines 
-    #no_mines = not superset.count
-    #all_safes = unknown and no_mines 
-    #all_mines = not no_mines and (superset.count == unknown)  
-    #deducted_and_propagated = False 
-                                                                                                                                                       
-    #superset_cells_cp = superset.cells.copy();
-    #if all_safes:  
-    #    for cell in superset_cells_cp:
-    #        self.mark_safe(cell)
-    #    deducted_and_propagated = True 
-    #elif all_mines:
-    #    for cell in superset_cells_cp:
-    #        self.mark_mine(cell)
-    #    deducted_and_propagated = True
-    def __try_create_new_knowledge(self, new_sentence: Sentence):  
+    def __all_safes(self, sentence: Sentence):
+        unknowns = len(sentence.cells) 
+        mines = sentence.count   
+         
+        return (unknowns > 0 and mines == 0)
+
+    def __all_mines(self, sentence: Sentence):
+        unknowns = len(sentence.cells) 
+        mines = sentence.count   
         
+        return (mines > 0 and mines == unknowns)
+
+
+    def __create_new_knowledge(self, new_sentence: Sentence):  
+        
+        new_knowledge = []
         for sentence in self.knowledge:       
             
             # Evita comparar novas sentenças com conjuntos que já foram totalmente revelados (vazios)
-            if not len(sentence.cells):
+            if len(sentence.cells) == 0:                                                                      
                 continue
+            
+
+            # -> It is guarantee that sentence have some unknown cells
 
             print("\n")
             print(f"iteration sentence: {sentence}\n")
             print(f"new sentence: {new_sentence}\n") 
 
             print("\n\n")
+ 
+            new_knowledge_sentence = self.is_proper_subset(new_sentence, sentence) # [New]
+            #if superset is not None:
             
-            # Ou a sentença ou a nova sentença será o Superset (ou não haverá relação entre os conjuntos)
-    
-            # 1. Caso a sentença seja o superset ela será atualizada na diferença com o subset (nova sentença). Para garantir
-            # que a nova sentença seja inserida na base de conhecimento sem duplicata, devemos realizar todas as iterações para apenas no final adicionar a estrutura
+            # [English]
+            # Nesta versão do algoritmo o conjunto original é mantido inalterado na base de conhecimento e a diferença entre o superconjunto e
+            # o subconjunto é criado como uma nova sentença, caso contrário não seria possível definir se as células que estão representando
+            # a diferença são minas ou seguras, portanto, também não seria possível transferi-las para a estrutura correspondente (known_safes ou known_mines)
+            if new_knowledge_sentence is not None and not self.knowledge.__contains__(new_knowledge_sentence):
+                new_knowledge.append(new_knowledge_sentence)
+                #if self.knowledge.__contains__(new_knowledge_sentence):
+                #    continue
 
-            # 2. Caso a nova sentença seja o superset, a sentença (subset) continua inalterada e podemos seguir a mesma diretriz para o caso acima, deixando para adicionar a nova senteça que terá sido modificada ou terá modificado durantes as iterações e provavelmente chegará ao final do método com menos elementos e com propriedades diferentes
-            superset = self.is_proper_subset(new_sentence, sentence)            
-            if superset is not None: 
-                print(f"superset: {superset}")
+                #print(f"superset: {superset}")
+                print(f"new_knowledge_sentence: {new_knowledge_sentence}")
 
-                revealed_mines = superset.known_mines()
-                revealed_safes = superset.known_safes()
+                #revealed_mines = superset.known_mines()
+                #revealed_safes = superset.known_safes()
 
-                for revealed in revealed_mines:
-                    self.mark_mine(revealed)
+                #for revealed in revealed_mines:
+                #    self.mark_mine(revealed)
 
-                for revealed in revealed_safes:
-                    self.mark_safe(revealed)
+                #for revealed in revealed_safes:
+                #    self.mark_safe(revealed)
                 
-                # After updating the Superset there is not elements left inside the cells property if they're all safes or all mines\
+                # The new knowledge is not updated (self.mark_mine and self.mark_safe does not have effect on sentences that are part of the KB)
+                revealed = self.__try_reveal(new_knowledge_sentence)
+                
+                # After updating the Superset there is not elements left inside the cells property if they're all safes or all mines
                 
                 # It means unknown will contain the value of 0 and all the cells from the original sentence will be inside the mines or safes structure
                 
@@ -298,17 +290,50 @@ class MinesweeperAI():
 
                 # The question is: How come the propagation for safe cells is happening? (clue: last block of code before terminating the add_knowledge function)
 
-                #keep_comparing = not deducted_and_propagated
-                if len(superset.cells):
+                #if len(superset.cells):
+                if not revealed:
+                    
                     # Revisar este retorno (com retorno e sem retorno não faz diferença, deveria fazer?)
-                    self.__try_create_new_knowledge(superset)  
+                    self.__create_new_knowledge(new_knowledge_sentence)
             else:
                 print(f"No relation for new_sentence: {new_sentence}")
 
+        self.knowledge.extend(new_knowledge)
+    
+    # Try to reveal mines or safes from the count and the cells attributes
+    def __try_reveal(self, new_sentence: Sentence) -> bool:
         
+        revealed = False
+        if new_sentence.count == 0:
+            
+            # Do it make sense to verify if number of cells in the sentence are not zero?
+            for cell in new_sentence.cells:
+                
+                # New sentence is not yet in the Knowledge Base, no need for copied cells, since this method does not change anything in the new sentence
+                self.mark_safe(cell)
+
+                new_sentence.cells.remove(cell)
+                new_sentence.safes.add(cell)
+
+            revealed = True 
+        elif new_sentence.count == len(new_sentence.cells):
+
+            new_sentence.cells = new_sentence.cells.copy()
+
+            for cell in new_sentence.cells:
+                self.mark_mine(cell)
+                new_sentence.cells.remove(cell)
+                new_sentence.mines.add(cell)
+                new_sentence.count -= 1
+            revealed = True
+
+        return revealed
+
+         
     def __build_acquired_sentence_from_existent_knowledge(self, neighboring: set, count: int) -> Sentence:
         
-        unknown = set()
+        # What happens if the sentence is a conclusion?
+        unknowns = set()
         safes = set()
         mines = set()
         for cell in neighboring:
@@ -317,19 +342,45 @@ class MinesweeperAI():
             elif self.mines.__contains__(cell):
                 mines.add(cell)
             else:
-                unknown.add(cell)
+                unknowns.add(cell) # What if it is a conclusion?
         
-        sentence = Sentence(unknown, count - len(mines))
+        sentence = Sentence(unknowns, count - len(mines))
         sentence.safes = safes
         sentence.mines = mines
                                                                                                                        
         return sentence
-   
   
-    def is_proper_subset(self, a: Sentence, b: Sentence) -> Sentence | None:  
+    def is_proper_subset_V2(self, a: Sentence, b: Sentence) -> Sentence | None:  
+        
+        new_sentence = None
         if not a.__eq__(b):
+                                                                               
             if a.cells.issubset(b.cells):
                 
+                # A is the subset 
+                print(f"subset: {a}") 
+                                                                               
+                mines_diff = max(b.count - a.count, 0)
+                new_sentence = Sentence(b.cells.difference(a.cells), mines_diff)
+                                                                                 
+                return b
+            elif b.cells.issubset(a.cells):
+                    
+                # B is the subset 
+                print(f"subset: {b}") 
+                                                                               
+                mines_diff = max(a.count - b.count, 0)
+                new_sentence = Sentence(a.cells.difference(b.cells), mines_diff)
+
+        return new_sentence 
+
+ 
+    def is_proper_subset(self, a: Sentence, b: Sentence) -> Sentence | None:  
+        if not a.__eq__(b):
+
+            if a.cells.issubset(b.cells):
+                
+                # A is the subset 
                 print(f"subset: {a}") 
 
                 mines_diff = max(b.count - a.count, 0)
@@ -338,7 +389,8 @@ class MinesweeperAI():
 
                 return b
             elif b.cells.issubset(a.cells):
- 
+                
+                # B is the subset
                 print(f"subset: {b}")
 
                 mines_diff = max(a.count - b.count, 0)
