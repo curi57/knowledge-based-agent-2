@@ -230,9 +230,16 @@ class MinesweeperAI():
                     intersection = sentence_x.cells.intersection(sentence_y.cells)
                     simmetric_diff = sentence_x.cells.symmetric_difference(sentence_y.cells)
                     
-                    if len(intersection) == len(simmetric_diff):
+                    if len(intersection) == len(simmetric_diff) and len(intersecion) == sentence_x.count:
+
+                        new_count = size_x - size_y
+                        if new_count < 0:
+                            continue
+
+                        print(f"new_count: {new_count}")
+
                         mine_sentence_candidate = Sentence(sentence_y.cells.difference(sentence_x.cells), size_x - size_y)
-                        safe_sentence_candidate = Sentence(sentence_x.cells.difference(sentence_y.cells), size_y - size_x)
+                        safe_sentence_candidate = Sentence(sentence_x.cells.difference(sentence_y.cells), max(0, size_y - size_x))
 
                         #self.mark_safe(safe_diff)
                         #self.mark_mine(mine_diff)
