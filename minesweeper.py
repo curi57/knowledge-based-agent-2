@@ -183,40 +183,60 @@ class MinesweeperAI():
         self.knowledge_repr()
         print(f"[DEBUG]")
  
-        # Finalizar propagação do conhecimento em todas as sentenças da base de conhecimento
-        # É este método que permite combinar múltiplas sentenças (?)
-
-        #:) MinesweeperAI.add_knowledge can infer multiple mines when given new information
-
-        #:( MinesweeperAI.add_knowledge can infer safe cells when given new information [Erro]
-        #did not find (0, 0) in safe cells when possible to conclude safe
-        
-        #:) MinesweeperAI.add_knowledge combines multiple sentences to draw conclusions
-
-        for sentence in self.knowledge:   
-            
-            unknowns = len(sentence.cells) # Quantity
-            mines = sentence.count 
-            all_safes = unknowns > 0 and mines == 0 
-            all_mines = mines > 0 and mines == unknowns
- 
-            sentence_cells_cp = sentence.cells.copy()
-            if all_safes:  
-                for cell in sentence_cells_cp:
-                    self.mark_safe(cell)
-            elif all_mines:
-                for cell in sentence_cells_cp:
-                    self.mark_mine(cell)
-
-            print(f"sentence.known_mines: {sentence.known_mines()}")
-            print(f"sentence.known_safes: {sentence.known_safes()}")
-
-             
+        self.__make_deduction_from_iteration_result() 
+       
         print(f"Knowledge after propagation completion:")
         self.knowledge_repr()
 
         print(f"self.mines [Total]: {self.mines}")
         print(f"self.safes [Total]: {self.safes}")  
+
+    
+    def __make_deduction_from_iteration_result(self):
+
+        for sentence_x in self.knowledge:  
+               
+            print(f"sentence.known_mines: {sentence_x.known_mines()}")
+            print(f"sentence.known_safes: {sentence_x.known_safes()}")
+
+            if len(sentence_x.cells) > 0:
+            
+                unknowns = len(sentence_x.cells) # Quantity
+                mines = sentence_x.count 
+                all_safes = unknowns > 0 and mines == 0 
+                all_mines = mines > 0 and mines == unknowns
+                propagate = all_safes or all_mines
+                                                  
+                if propagate:
+                    sentence_x_cells_cp = sentence_x.cells.copy()
+                    if all_safes:  
+                        for cell in sentence_x_cells_cp:
+                            self.mark_safe(cell)
+                    elif all_mines:
+                        for cell in sentence_x_cells_cp:
+                            self.mark_mine(cell)
+
+                    return self.__make_deduction_from_iteration_result()
+
+
+                for sentence_y in self.knowledge:
+                    
+                    size_x = len(sentence_x.cells)
+                    size_y = len(sentence_y.cells)
+
+                    if not size_x == size_y:
+                        continue 
+                    
+                    intersection = sentence_x.cells.intersection(sentence_y.cells)
+                    simmetric_diff = sentence_x.cells.symmetric_difference(sentence_y.cells)
+                    
+                    if len(intersection) == len(simmetric_diff):
+                        mine_sentence_candidate = Sentence(sentence_y.cells.difference(sentence_x.cells), size_x - size_y)
+                        safe_sentence_candidate = Sentence(sentence_x.cells.difference(sentence_y.cells), size_y - size_x)
+
+                        #self.mark_safe(safe_diff)
+                        #self.mark_mine(mine_diff)
+            
 
     def __all_safes(self, sentence: Sentence):
         unknowns = len(sentence.cells) 
@@ -231,6 +251,19 @@ class MinesweeperAI():
         return (mines > 0 and mines == unknowns)
 
 
+    # After updating the Superset there is not elements left inside the cells property if they're all safes or all mines
+    
+    # It means unknown will contain the value of 0 and all the cells from the original sentence will be inside the mines or safes structure
+    
+    # I this case all_safes will return False because unknown is 0 (False)
+    
+    # all_mines will propably return False either because not(no_mines) will return False (no_mines is True and not(no_mines) is False) resulting the 
+    # proposition to be False
+                                                                                                                                                       
+    # In both cases deducted_and_propagated will return False and therefore the recursion will be called for a empty sentence, 
+    # wasting time and computational resources. Also, no propagation will be done resulting in wrong outputs.
+                                                                                                                                                       
+    # The question is: How come the propagation for safe cells is happening? (clue: last block of code before terminating the add_knowledge function)
     def __create_new_knowledge(self, new_sentence: Sentence):  
         
         new_knowledge = []
@@ -258,39 +291,15 @@ class MinesweeperAI():
             # a diferença são minas ou seguras, portanto, também não seria possível transferi-las para a estrutura correspondente (known_safes ou known_mines)
             if new_knowledge_sentence is not None and not self.knowledge.__contains__(new_knowledge_sentence):
                 new_knowledge.append(new_knowledge_sentence)
-                #if self.knowledge.__contains__(new_knowledge_sentence):
-                #    continue
-
+                #self.knowledge.append(new_knowledge_sentence)
+                
                 #print(f"superset: {superset}")
                 print(f"new_knowledge_sentence: {new_knowledge_sentence}")
 
-                #revealed_mines = superset.known_mines()
-                #revealed_safes = superset.known_safes()
-
-                #for revealed in revealed_mines:
-                #    self.mark_mine(revealed)
-
-                #for revealed in revealed_safes:
-                #    self.mark_safe(revealed)
-                
+                  
                 # The new knowledge is not updated (self.mark_mine and self.mark_safe does not have effect on sentences that are part of the KB)
                 revealed = self.__try_reveal(new_knowledge_sentence)
                 
-                # After updating the Superset there is not elements left inside the cells property if they're all safes or all mines
-                
-                # It means unknown will contain the value of 0 and all the cells from the original sentence will be inside the mines or safes structure
-                
-                # I this case all_safes will return False because unknown is 0 (False)
-                
-                # all_mines will propably return False either because not(no_mines) will return False (no_mines is True and not(no_mines) is False) resulting the 
-                # proposition to be False
-
-                # In both cases deducted_and_propagated will return False and therefore the recursion will be called for a empty sentence, 
-                # wasting time and computational resources. Also, no propagation will be done resulting in wrong outputs.
-
-                # The question is: How come the propagation for safe cells is happening? (clue: last block of code before terminating the add_knowledge function)
-
-                #if len(superset.cells):
                 if not revealed:
                     
                     # Revisar este retorno (com retorno e sem retorno não faz diferença, deveria fazer?)
@@ -299,8 +308,7 @@ class MinesweeperAI():
                 print(f"No relation for new_sentence: {new_sentence}")
 
         self.knowledge.extend(new_knowledge)
-    
-    # Try to reveal mines or safes from the count and the cells attributes
+        
     def __try_reveal(self, new_sentence: Sentence) -> bool:
         
         revealed = False
