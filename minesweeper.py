@@ -360,114 +360,56 @@ class MinesweeperAI():
 
   
         
-# Create new knowledge
-# After updating the Superset there is not elements left inside the cells property if they're all safes or all mines
-
-# It means unknown will contain the value of 0 and all the cells from the original sentence will be inside the mines or safes structure
-
-# I this case all_safes will return False because unknown is 0 (False)
-
-# all_mines will propably return False either because not(no_mines) will return False (no_mines is True and not(no_mines) is False) resulting the 
-# proposition to be False
-                                                                                                                                                   
-# In both cases deducted_and_propagated will return False and therefore the recursion will be called for a empty sentence, 
-# wasting time and computational resources. Also, no propagation will be done resulting in wrong outputs.
-                                                                                                                                                   
-# The question is: How come the propagation for safe cells is happening? (clue: last block of code before terminating the add_knowledge function)
 
 
-#new_knowledge = []
-#for sentence in self.knowledge:       
-#    
-#    # Evita comparar novas sentenças com conjuntos que já foram totalmente revelados (vazios)
-#    if len(sentence.cells) == 0:                                                                      
-#        continue
-#    
-                                                                                                                                                        
-#    # -> It is guarantee that sentence have some unknown cells
-                                                                                                                                                        
-#    print("\n")
-#    print(f"iteration sentence: {sentence}\n")
-#    print(f"new sentence: {new_sentence}\n") 
-                                                                                                                                                        
-#    print("\n\n")
-                                                                                                                                                        
-#    new_knowledge_sentence = self.is_proper_subset(new_sentence, sentence) # [New]
-#    #if superset is not None:
-#    
-#    # [English]
-#    # Nesta versão do algoritmo o conjunto original é mantido inalterado na base de conhecimento e a diferença entre o superconjunto e
-#    # o subconjunto é criado como uma nova sentença, caso contrário não seria possível definir se as células que estão representando
-#    # a diferença são minas ou seguras, portanto, também não seria possível transferi-las para a estrutura correspondente (known_safes ou known_mines)
-#    if new_knowledge_sentence is not None and not self.knowledge.__contains__(new_knowledge_sentence):
-#        new_knowledge.append(new_knowledge_sentence)
-#        #self.knowledge.append(new_knowledge_sentence)
-#        
-#        #print(f"superset: {superset}")
-#        print(f"new_knowledge_sentence: {new_knowledge_sentence}")
-                                                                                                                                                        
-#          
-#        # The new knowledge is not updated (self.mark_mine and self.mark_safe does not have effect on sentences that are part of the KB)
-#        revealed = self.__try_reveal(new_knowledge_sentence)
-#        
-#        if not revealed:
-#            
-#            # Revisar este retorno (com retorno e sem retorno não faz diferença, deveria fazer?)
-#            self.__create_new_knowledge(new_knowledge_sentence)
-#    else:
-#        print(f"No relation for new_sentence: {new_sentence}")
-                                                                                                                                                        
-#self.knowledge.extend(new_knowledge)
 
-                                                                                                                                                       
-#def is_proper_subset_V2(self, a: Sentence, b: Sentence) -> Sentence | None:  
-#    
-#    new_sentence = None
-#    if not a.__eq__(b):
-#                                                                           
-#        if a.cells.issubset(b.cells):
-#            
-#            # A is the subset 
-#            print(f"subset: {a}") 
-#                                                                           
-#            mines_diff = max(b.count - a.count, 0)
-#            new_sentence = Sentence(b.cells.difference(a.cells), mines_diff)
-#                                                                             
-#            return b
-#        elif b.cells.issubset(a.cells):
-#                
-#            # B is the subset 
-#            print(f"subset: {b}") 
-#                                                                           
-#            mines_diff = max(a.count - b.count, 0)
-#            new_sentence = Sentence(a.cells.difference(b.cells), mines_diff)
-                                                                                                                                                       
-#    return new_sentence 
-                                                                                                                                                       
-                                                                                                                                                       
-#def is_proper_subset(self, a: Sentence, b: Sentence) -> Sentence | None:  
-#    if not a.__eq__(b):
-                                                                                                                                                       
-#        if a.cells.issubset(b.cells):
-#            
-#            # A is the subset 
-#            print(f"subset: {a}") 
-                                                                                                                                                       
-#            mines_diff = max(b.count - a.count, 0)
-#            b.cells.difference_update(a.cells)
-#            b.count = mines_diff
-                                                                                                                                                       
-#            return b
-#        elif b.cells.issubset(a.cells):
-#            
-#            # B is the subset
-#            print(f"subset: {b}")
-                                                                                                                                                       
-#            mines_diff = max(a.count - b.count, 0)
-#            a.cells.difference_update(b.cells)
-#            a.count = mines_diff
-                                                                                                                                                       
-#            return a
-#    
-#    return None 
-    #return a != b and a.cells.issubset(b.cells) 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
