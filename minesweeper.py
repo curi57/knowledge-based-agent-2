@@ -271,6 +271,7 @@ class MinesweeperAI():
     
     def __create_new_knowledge(self, new_sentence: Sentence): 
         
+        new_knowledge = []
         for sentence_x in self.knowledge: 
 
             # Evita comparar novas sentenças com conjuntos que já foram totalmente revelados (vazios)
@@ -279,7 +280,6 @@ class MinesweeperAI():
 
             # -> It is guarantee that sentence have some unknown cells
 
-            new_knowledge = []
             for sentence_y in self.knowledge:
                     
                 print("\n")
@@ -316,7 +316,7 @@ class MinesweeperAI():
                         if self.__propagate_if_new(new_sentence_y):
                             new_knowledge.append(new_sentence_y)
  
-            self.knowledge.extend(new_knowledge) 
+        self.knowledge.extend(new_knowledge) 
                      
     # Aplicar operação com matriz
     def get_neighboring(self, cell: tuple):
