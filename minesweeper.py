@@ -2,15 +2,6 @@ import random
 from typing import List
 
 
-
-# o quê fazer depois de criar uma nova sentença (inferência) a partir da sentença combinada?
-# a sentença combinada foi criada e populada na iteração, portanto, não existe na base de conhecimento
-# se essa sentença for capaz de propagar inferências absolutas sobre o jogo, não será necessário adiciona-la a base de conhecimento
-# porém, se a inferência for parcial, ela pode ser usada na próxima recursão?
-# então teríamos uma branch criada para a inferência (combinada) e uma iteração que continua com a nova sentença sendo testada com outros conjuntos (ok?)
-# se a inferência parcial chamar a recursão, teremos um outro contexto de memória, onde a sentença combinada é reiniciada
-
-# como adicionamos esta nova inferência combinada a base de conhecimento?
 class Minesweeper():
     
     def __init__(self, height=4, width=4, mines=4):
@@ -147,7 +138,9 @@ class MinesweeperAI():
         # This method filter the cells from the new sentence based on the known mines and known safes 
         acquired_sentence = self.__build_acquired_sentence_from_existent_knowledge(neighboring, count)  
         self.knowledge.append(acquired_sentence)
+
         print(f"acquired_sentence: {acquired_sentence}")
+
         if len(acquired_sentence.cells): 
             if self.__all_safes(acquired_sentence): 
                 cp_cells = acquired_sentence.cells.copy()
@@ -202,9 +195,6 @@ class MinesweeperAI():
     def __make_deduction_from_iteration_result(self):
           
         for sentence in self.knowledge:  
-            
-            print(f"sentence.known_mines: {sentence.known_mines()}")
-            print(f"sentence.known_safes: {sentence.known_safes()}")
 
             if len(sentence.cells) > 0:
             
@@ -222,9 +212,14 @@ class MinesweeperAI():
                     elif all_mines:
                         for cell in sentence_cells_cp:
                             self.mark_mine(cell)
+                    
+                    print(f"sentence.known_mines: {sentence.known_mines()}")
+                    print(f"sentence.known_safes: {sentence.known_safes()}")
 
                     return self.__make_deduction_from_iteration_result() 
-
+            
+            
+            
 
     def __all_safes(self, sentence: Sentence):
         unknowns = len(sentence.cells) 
@@ -238,28 +233,36 @@ class MinesweeperAI():
         
         return (mines > 0 and mines == unknowns)
 
-    def __try_propagate(self, new_sentences: List[Sentence]):
+    def __try_propagate(self, sentence: Sentence) -> bool:
         
-        for sentence in new_sentences:
-            cp_cells = sentence.cells.copy()
+        # The method contains verify if sentence is already in KB (because of the inner for loop, wich creates each relation 2 times) and the length verification is for to avoid to add zero sets coming from a subset/superset relation
+        propagated = False 
+        cp_cells = sentence.cells.copy()
+            
+        if self.__all_safes(sentence):
+            propagated = True 
+            for cell in cp_cells:        
+                self.mark_safe(cell)
+                  
+        elif self.__all_mines(sentence):
+            propagated = True 
+            for cell in cp_cells:
+                self.mark_mine(cell)
 
-            # The method contains verify if sentence is already in KB (because of the inner for loop, wich creates each relation 2 times) and the length verification is for to avoid to add zero sets coming from a subset/superset relation
-            if not self.knowledge.__contains__(sentence) and len(sentence.cells) > 0:
-                
-                self.knowledge.append(sentence)
-                
-                if self.__all_safes(sentence):        
-                    for cell in cp_cells:        
-                        self.mark_safe(cell)
-                          
-                elif self.__all_mines(sentence):
-                    for cell in cp_cells:
-                        self.mark_mine(cell)
-                        
+        return propagated
+
+
+    def __try_save(self, sentence: Sentence) -> bool:
+        
+        if not self.knowledge.__contains__(sentence) and len(sentence.cells) > 0:
+            self.knowledge.append(sentence)
+            return True
+        
+        return False
+        
 
     def __create_new_knowledge(self): 
         
-        new_knowledge = []
         for sentence_x in self.knowledge: 
 
             # Evita comparar novas sentenças com conjuntos que já foram totalmente revelados (vazios)
@@ -279,26 +282,34 @@ class MinesweeperAI():
                     print(f"intersection: {intersection}")
 
                     safe_cells_x = min(len(sentence_x.cells) - sentence_x.count, len(intersection))
+                    
                     # The minimum number of mines in the intersecion concluded by looking at the set A
                     min_mines_intersection_x = len(intersection) - safe_cells_x
                     
                     safe_cells_y = min(len(sentence_y.cells) - sentence_y.count, len(intersection))
+                    
                     # The minimum number of mines in the intersecion concluded by looking at the set B
                     min_mines_intersection_y = len(intersection) - safe_cells_y
-                    
-                    print(f"min_mines_intersection_x: {min_mines_intersection_x}")
-                    print(f"min_mines_intersection_y: {min_mines_intersection_y}")
+                      
                     if min_mines_intersection_x or min_mines_intersection_y:
                         
                         new_sentence = Sentence(intersection, max(min_mines_intersection_x, min_mines_intersection_y))       
-                        new_sentence_x = Sentence(sentence_x.cells.difference(new_sentence.cells), max(0, sentence_x.count - new_sentence.count))
-                        new_sentence_y = Sentence(sentence_y.cells.difference(new_sentence.cells), max(0, sentence_y.count - new_sentence.count))
+                        virtual_sentence_x = Sentence(sentence_x.cells.difference(new_sentence.cells), max(0, sentence_x.count - new_sentence.count))
+                        virtual_sentence_y = Sentence(sentence_y.cells.difference(new_sentence.cells), max(0, sentence_y.count - new_sentence.count))
                         
-                        self.__try_propagate([new_sentence, new_sentence_x, new_sentence_y])
-                             
-        self.knowledge.extend(new_knowledge) 
-                     
-    # Aplicar operação com matriz
+                        has_propagated = False
+                        kb_included = self.__try_save(new_sentence)
+                        if kb_included:
+                            has_propagated = self.__try_propagate(new_sentence)
+
+                        has_propagated = has_propagated or self.__try_propagate(virtual_sentence_x)
+                        has_propagated = has_propagated or self.__try_propagate(virtual_sentence_y)
+
+                        if has_propagated:
+                            print(f"had propagation: {has_propagated}")
+                            #return self.__create_new_knowledge()
+              
+    # Apply Matrix Operation
     def get_neighboring(self, cell: tuple):
         neighboring = set()
         for i in range(cell[0] - 1, cell[0] + 2):
