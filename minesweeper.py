@@ -23,6 +23,7 @@ class Minesweeper():
                 self.mines.add((i, j))
                 self.board[i][j] = True
 
+        print(self.mines)
         self.mines_found = set()
 
     def print(self):  
@@ -55,7 +56,7 @@ class Minesweeper():
 
         return count
 
-    def won(self):  
+    def won(sel):  
         return self.mines_found == self.mines
 
 
@@ -76,9 +77,15 @@ class Sentence():
         return f"{self.cells} = {self.count}"
 
     def known_mines(self):
-        return self.mines    
-        
+        # If all cells in the sentence are mines, return them
+        if len(self.cells) == self.count:
+            return self.cells.copy()
+        # Otherwise, no definitive conclusion
+        return set()
+  
     def known_safes(self):
+        if self.count == 0:
+            return self.cells.copy()
         return self.safes        
         
     def mark_mine(self, cell):
@@ -117,13 +124,6 @@ class MinesweeperAI():
         for sentence in self.knowledge:
             sentence.mark_safe(cell)
 
-    def knowledge_repr(self):
-        print("--------------------------------------------------------------------------------------")
-        for sentence in self.knowledge:
-            print(f"sentence: {sentence}")
-        print("--------------------------------------------------------------------------------------")
-
-
     def add_knowledge(self, cell, count):                                                                                                                                             
         
         print("---------------------------------------------------------------------------------------")
@@ -131,49 +131,12 @@ class MinesweeperAI():
         print(f"{cell} - {count}\n")  
     
         self.moves_made.add(cell)         
-        self.mark_safe(cell) 
+        self.mark_safe(cell)
+
+        self.__use_inference()
 
         neighboring = self.get_neighboring(cell)
 
-        # This method filter the cells from the new sentence based on the known mines and known safes 
-        acquired_sentence = self.__build_acquired_sentence_from_existent_knowledge(neighboring, count)  
-        self.knowledge.append(acquired_sentence)
-
-        print(f"acquired_sentence: {acquired_sentence}")
-
-        if len(acquired_sentence.cells): 
-            if self.__all_safes(acquired_sentence): 
-                cp_cells = acquired_sentence.cells.copy()
-                for cell in cp_cells:  
-                    self.mark_safe(cell)
-            elif self.__all_mines(acquired_sentence):
-                cp_cells = acquired_sentence.cells.copy()
-                for cell in cp_cells:
-                    self.mark_mine(cell)
-
-              
-        print("----------------------------------------------------------") 
-        print("Try to create new knowledge:")
-        print("----------------------------------------------------------")
-       
-        self.__create_new_knowledge()
-
-        print(f"[DEBUG] Knowledge BEFORE propagation completion:")
-        self.knowledge_repr()
-        print(f"[DEBUG]")
- 
-        self.__make_deduction_from_iteration_result() 
-       
-        print(f"Knowledge after propagation completion:")
-        self.knowledge_repr()
-
-        print(f"self.mines [Total]: {self.mines}")
-        print(f"self.safes [Total]: {self.safes}")  
-
-
-    def __build_acquired_sentence_from_existent_knowledge(self, neighboring: set, count: int) -> Sentence:              
-        
-        # What happens if the sentence is a conclusion?
         unknowns = set()
         safes = set()
         mines = set()
@@ -183,73 +146,62 @@ class MinesweeperAI():
             elif self.mines.__contains__(cell):
                 mines.add(cell)
             else:
-                unknowns.add(cell) # What if it is a conclusion?
-       
-        sentence = Sentence(unknowns, count - len(mines))
-        sentence.safes = safes
-        sentence.mines = mines
-                                                                                                                  
-        return sentence
+                unknowns.add(cell) 
+                                                          
+        acquired_sentence = Sentence(unknowns, count - len(mines))
+        acquired_sentence.safes = safes
+        acquired_sentence.mines = mines
+  
+        self.knowledge.append(acquired_sentence)
+        
+        print(f"Complete Sentence: {Sentence(neighboring, count)}")
+        print(f"Reduced Sentence [acquired_sentence]: {acquired_sentence}")
  
- 
-    def __make_deduction_from_iteration_result(self):
-          
-        for sentence in self.knowledge:  
+        print(f"[DEBUG] Knowledge BEFORE __create_new_knowledge and __use_inference:")
+        print("--------------------------------------------------------------------------------------")
+        for sentence in self.knowledge:
+            print(f"sentence: {sentence}")
+        print("--------------------------------------------------------------------------------------")
 
-            if len(sentence.cells) > 0:
-            
-                unknowns = len(sentence.cells) # Quantity
-                mines = sentence.count 
-                all_safes = unknowns > 0 and mines == 0 
-                all_mines = mines > 0 and mines == unknowns
-                propagate = all_safes or all_mines
-                                                  
-                if propagate:
-                    sentence_cells_cp = sentence.cells.copy()
-                    if all_safes:  
-                        for cell in sentence_cells_cp:
-                            self.mark_safe(cell)
-                    elif all_mines:
-                        for cell in sentence_cells_cp:
-                            self.mark_mine(cell)
-                    
-                    print(f"sentence.known_mines: {sentence.known_mines()}")
-                    print(f"sentence.known_safes: {sentence.known_safes()}")
-
-                    return self.__make_deduction_from_iteration_result() 
-            
-            
-            
-
-    def __all_safes(self, sentence: Sentence):
-        unknowns = len(sentence.cells) 
-        mines = sentence.count   
+        self.__create_new_knowledge() 
          
-        return (unknowns > 0 and mines == 0)
+        print(f"[DEBUG] Knowledge AFTER __create_new_knowledge and __use_inference:")
+        print("--------------------------------------------------------------------------------------")
+        for sentence in self.knowledge:
+            print(f"sentence: {sentence}")
 
-    def __all_mines(self, sentence: Sentence):
-        unknowns = len(sentence.cells) 
-        mines = sentence.count   
+        print("--------------------------------------------------------------------------------------")  
+        for sentence in self.knowledge:
+            print(f"sentence.known_mines: {sentence.known_mines()}")
+            print(f"sentence.known_safes: {sentence.known_safes()}")
+ 
+
+    def __use_inference(self):
         
-        return (mines > 0 and mines == unknowns)
+        count = 0
+        while count < len(self.knowledge):
 
-    def __try_propagate(self, sentence: Sentence) -> bool:
-        
-        # The method contains verify if sentence is already in KB (because of the inner for loop, wich creates each relation 2 times) and the length verification is for to avoid to add zero sets coming from a subset/superset relation
-        propagated = False 
-        cp_cells = sentence.cells.copy()
-            
-        if self.__all_safes(sentence):
-            propagated = True 
-            for cell in cp_cells:        
-                self.mark_safe(cell)
-                  
-        elif self.__all_mines(sentence):
-            propagated = True 
-            for cell in cp_cells:
-                self.mark_mine(cell)
+            sentence = self.knowledge.__getitem__(count)
 
-        return propagated
+            print(f"Sentence [Make Deduction]: {sentence}")
+
+            unknowns = len(sentence.cells) 
+            mines = sentence.count 
+            all_safes = unknowns > 0 and mines == 0 
+            all_mines = mines > 0 and mines == unknowns
+            propagate = all_safes or all_mines
+                                              
+            if propagate:
+                count = 0
+                sentence_cells_cp = sentence.cells.copy()
+                if all_safes:  
+                    for cell in sentence_cells_cp:
+                        self.mark_safe(cell)
+                elif all_mines:
+                    for cell in sentence_cells_cp:
+                        self.mark_mine(cell)
+            else:
+                count += 1
 
 
     def __try_save(self, sentence: Sentence) -> bool:
@@ -263,52 +215,95 @@ class MinesweeperAI():
 
     def __create_new_knowledge(self): 
         
+        self.__use_inference()       
         for sentence_x in self.knowledge: 
-
-            # Evita comparar novas sentenças com conjuntos que já foram totalmente revelados (vazios)
+            
+            # Avoid to compare new sentences to completely revealed sets
             if len(sentence_x.cells) == 0:                                                                      
                 continue
-
+            
             for sentence_y in self.knowledge:
-                    
+                
+                kb_updated = False 
+
+                # Avoid to compare new sentences to completely revealed sets
+                if len(sentence_y.cells) == 0 or sentence_y.__eq__(sentence_x):                                                                      
+                    continue
+ 
                 print("\n")
                 print(f"sentence_x: {sentence_x}\n")
                 print(f"sentence_y: {sentence_y}\n")                                                 
                 print("\n\n")
 
-                intersection = sentence_x.cells.intersection(sentence_y.cells)
-                if len(intersection) and not sentence_x.__eq__(sentence_y):
-
-                    print(f"intersection: {intersection}")
-
-                    safe_cells_x = min(len(sentence_x.cells) - sentence_x.count, len(intersection))
+                if sentence_y.cells.issubset(sentence_x.cells):
                     
-                    # The minimum number of mines in the intersecion concluded by looking at the set A
-                    min_mines_intersection_x = len(intersection) - safe_cells_x
-                    
-                    safe_cells_y = min(len(sentence_y.cells) - sentence_y.count, len(intersection))
-                    
-                    # The minimum number of mines in the intersecion concluded by looking at the set B
-                    min_mines_intersection_y = len(intersection) - safe_cells_y
+                    new_sentence = Sentence(sentence_x.cells.difference(sentence_y.cells), max(0, sentence_x.count - sentence_y.count))
+                    print(f"new_sentence [Subset]: {new_sentence}")
+                    kb_updated = self.__try_save(new_sentence)
+                    if kb_updated:
+                        self.knowledge.remove(sentence_x)
                       
-                    if min_mines_intersection_x or min_mines_intersection_y:
-                        
-                        new_sentence = Sentence(intersection, max(min_mines_intersection_x, min_mines_intersection_y))       
-                        virtual_sentence_x = Sentence(sentence_x.cells.difference(new_sentence.cells), max(0, sentence_x.count - new_sentence.count))
-                        virtual_sentence_y = Sentence(sentence_y.cells.difference(new_sentence.cells), max(0, sentence_y.count - new_sentence.count))
-                        
-                        has_propagated = False
-                        kb_included = self.__try_save(new_sentence)
-                        if kb_included:
-                            has_propagated = self.__try_propagate(new_sentence)
+                elif sentence_x.cells.issubset(sentence_y.cells):
 
-                        has_propagated = has_propagated or self.__try_propagate(virtual_sentence_x)
-                        has_propagated = has_propagated or self.__try_propagate(virtual_sentence_y)
+                    new_sentence = Sentence(sentence_y.cells.difference(sentence_x.cells), max(0, sentence_y.count - sentence_x.count))
+                    print(f"new_sentence [Subset]: {new_sentence}")
+                    
+                    kb_updated = self.__try_save(new_sentence)
+                    if kb_updated:
+                        self.knowledge.remove(sentence_y)  
+                else:
 
-                        if has_propagated:
-                            print(f"had propagation: {has_propagated}")
-                            #return self.__create_new_knowledge()
-              
+                    intersection = sentence_x.cells.intersection(sentence_y.cells)
+                    if len(intersection) and not sentence_x.__eq__(sentence_y):
+ 
+                        # Represent the number of safe cells: cannot be Negative
+                        #safe_cells_x = min(len(sentence_x.cells) - sentence_x.count, len(intersection))
+                        no_mines_x = len(sentence_x.cells) - sentence_x.count
+                        
+                        # The minimum number of mines in the intersecion (concluded by looking at the set A)
+                        # Safe cells are retrieved by subtracting the count value from the length of the set. 
+                        min_mines_intersection_x = len(intersection) - no_mines_x # Observation: A negative number means a minimum
+                        # of safes elements in Intersection
+
+                        max_mines_intersection_x = min(sentence_x.count, len(intersection))
+                        
+                        no_mines_y = len(sentence_y.cells) - sentence_y.count
+
+                        # The minimum number of mines in the intersecion concluded by looking at the set B
+                        min_mines_intersection_y = len(intersection) - no_mines_y # A negative number means Safes (in Intersection)
+
+                        # The max number of mines is the count value when count is smaller then the size of the Intersection 
+                        # Ex. A set with a count of 3 and a Intersection with a length of 2 couldn't have a max number of mines of 3
+                        # (more mines of elements in the Intersection Set)
+                        max_mines_intersection_y = min(sentence_y.count, len(intersection))
+ 
+                        new_count = None 
+                        if max_mines_intersection_x == min_mines_intersection_y:
+                            new_count = max_mines_intersection_x
+                        if max_mines_intersection_y == min_mines_intersection_x:
+                            new_count = max_mines_intersection_y
+            
+                        if new_count is not None:
+                            new_sentence = Sentence(intersection, new_count)       
+                            print(f"new_sentence [Intersection]: {new_sentence}")
+                              
+                            virtual_sentence_x = Sentence(
+                                    sentence_x.cells.difference(new_sentence.cells), 
+                                    max(0, sentence_x.count - new_sentence.count))
+                            print(f"virtual_sentence_x: {virtual_sentence_x}")
+                            
+                            virtual_sentence_y = Sentence(
+                                    sentence_y.cells.difference(new_sentence.cells), 
+                                    max(0, sentence_y.count - new_sentence.count))
+                            print(f"virtual_sentence_x: {virtual_sentence_y}")
+ 
+                            kb_updated = self.__try_save(virtual_sentence_x)
+                            kb_updated = self.__try_save(virtual_sentence_y) or kb_updated
+            
+                if kb_updated:                           
+                    self.__use_inference()
+                             
+            
     # Apply Matrix Operation
     def get_neighboring(self, cell: tuple):
         neighboring = set()
